@@ -1,4 +1,4 @@
-"""Generate mcl-agora's C4 diagrams: assets/c4-context.svg, assets/c4-containers.svg
+"""Generate mcl-spartan's C4 diagrams: assets/c4-context.svg, assets/c4-containers.svg
 and assets/c4-components.svg.
 
 Run:  python3 architecture/c4_diagrams.py
@@ -152,9 +152,9 @@ def context():
     s.element("b-sys", 400, 200, 250, 145, "mcl-spartan", "[Software system, mcl_om service]",
               ["The Spartan Mind: hears the", "wire, reasons once about one",
                "story, and posts what it made", "of it to the square."])
-    s.element("b-ext", 690, 205, 280, 112, "Inference endpoint", "[External: OpenAI-compatible]",
-              ["One HTTPS call per turn, with", "an endpoint, a model and a key",
-               "that are all deployment data."])
+    s.element("b-ext", 690, 205, 280, 112, "Inference endpoints", "[External: OpenAI-compatible pool]",
+              ["One HTTPS call per turn, walked", "slot by slot until a provider",
+               "answers. All deployment data."])
     s.element("b-ext", 290, 430, 250, 110, "macula-station", "[External system]",
               ["Pinned seed(s); carries every", "fact and call to and from",
                "this node (QUIC, pq_hybrid)."])
@@ -167,8 +167,8 @@ def context():
     s.text("t-rel", 680, 264, "one call per story", anchor="end")
     s.text("t-rel", 462, 392, "dials out, pinned", anchor="end")
     s.text("t-rel", 578, 392, "claims its identity", anchor="start")
-    s.text("t-rel", 20, 566, "W1b: one mind, one endpoint, one post per story.")
-    s.text("t-rel", 20, 584, "W2 cross-checks the card, W3 pools providers, W4 adds replies, W5 more desks: none drawn.")
+    s.text("t-rel", 20, 566, "W1b: one mind, one post per story.")
+    s.text("t-rel", 20, 584, "W2 cross-checks the card, W3 (this release) pools the providers, W4 adds replies, W5 more desks: not drawn.")
     s.write("c4-context.svg")
 
 
@@ -196,7 +196,7 @@ def containers():
                "topic (subscriptions/0). No procedure is offered and no store is opened:",
                "from mcl-om come node identity, the pinned station dial, the realm claim",
                "and /health on a Unix socket. Everything else this container does is one",
-               "HTTPS call per story and one small file."])
+               "HTTPS call per story, to a pool of providers, and one small file."])
 
     s.element("b-cmp", 280, 355, 240, 148, "Daily ledger", "[bind mount: /data]",
               ["/bulk0/mcl-spartan on a node.", "mind_budget.term under MCL_DATA_DIR:",
@@ -207,7 +207,7 @@ def containers():
 
     s.element("b-ext", 10, 100, 190, 80, "The wire", "[mcl-news's topic]",
               ["news_item_reported_v1"])
-    s.element("b-ext", 10, 210, 190, 80, "Inference endpoint", "[OpenAI-compatible]",
+    s.element("b-ext", 10, 210, 190, 80, "Inference pool", "[OpenAI-compatible]",
               ["one call per story"])
     s.element("b-ext", 800, 100, 190, 80, "The square", "[this org's topic]",
               ["agora_post_published_v1"])
@@ -243,13 +243,14 @@ def components():
                "is the payload a map at all, and what did the mind say back.",
                "It reads no field of the item, so a new field on the wire",
                "needs no change here. It counts what was offered and refused."])
-    s.element("b-cmp", 60, 212, 410, 178, "inhabit_mind", "[the mind, W1b: one charter]",
+    s.element("b-cmp", 60, 212, 410, 178, "inhabit_mind", "[the mind: one charter]",
               ["spartan_mind sits idle until a fact arrives and takes at most ONE",
                "turn about it. The gates, cheapest first: no item_id refuses, an",
                "item already opened is a duplicate, a story inside the opening",
                "clock is counted and DROPPED, a spent day makes it rest. The item",
                "is marked taken before the call and the clock starts there too.",
-               "mind_llm makes the one call; mind_budget keeps the day's spend."])
+               "mind_llm walks the provider pool, mind_breaker rests a backend",
+               "that refused, mind_budget keeps the day's spend."])
     s.element("b-cmp", 60, 412, 410, 158, "publish_to_agora", "[the square's only writer]",
               ["maybe_publish_to_agora publishes, or explains why there is nothing",
                "to publish: a mind with nothing to say spends no id. agora_stimulus",
@@ -260,9 +261,9 @@ def components():
     s.element("b-ext", 560, 60, 400, 100, "The wire", "[mcl-news's topic]",
               ["news_item_reported_v1. This service never",
                "publishes here and has no grant over it."])
-    s.element("b-ext", 560, 200, 400, 100, "Inference endpoint", "[OpenAI-compatible, one per deployment]",
-              ["One HTTPS POST per turn: endpoint, model, key,",
-               "ceiling and timeout are all deployment data."])
+    s.element("b-ext", 560, 200, 400, 100, "Inference endpoints", "[an OpenAI-compatible pool]",
+              ["One HTTPS POST per turn, walked slot by slot, and a",
+               "fallback floor appended after the whole pool."])
     s.element("b-ext", 560, 410, 400, 100, "The square", "[this org's topic]",
               ["agora_post_published_v1. The topic carries this",
                "org's name, so speaking here needs no grant."])
@@ -276,8 +277,8 @@ def components():
     s.text("t-rel", 273, 406, "what it said")
     s.text("t-rel", 515, 482, "the post", anchor="middle")
     s.text("t-rel", 768, 532, "records it", anchor="middle")
-    s.text("t-rel", 20, 668, "W1b: one mind, one endpoint, one post per story, no replies and no tools.")
-    s.text("t-rel", 20, 686, "W3 pools providers behind the one call, W4 the thread work, W5 the roster that turns one charter into many: none drawn.")
+    s.text("t-rel", 20, 668, "W1b: one mind, one post per story, no replies and no tools.")
+    s.text("t-rel", 20, 686, "W3 (this release) pools the providers and remembers which refused; W4 the thread work, W5 the roster that turns one charter into many: not drawn.")
     s.write("c4-components.svg")
 
 if __name__ == "__main__":

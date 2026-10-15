@@ -77,11 +77,11 @@
 <text class="t-desc" x="416" y="302">story, and posts what it made</text>
 <text class="t-desc" x="416" y="318">of it to the square.</text>
 <rect class="b-ext" x="690" y="205" width="280" height="112" rx="10"/>
-<text class="t-name" x="706" y="233">Inference endpoint</text>
-<text class="t-type" x="706" y="251">[External: OpenAI-compatible]</text>
-<text class="t-desc" x="706" y="275">One HTTPS call per turn, with</text>
-<text class="t-desc" x="706" y="291">an endpoint, a model and a key</text>
-<text class="t-desc" x="706" y="307">that are all deployment data.</text>
+<text class="t-name" x="706" y="233">Inference endpoints</text>
+<text class="t-type" x="706" y="251">[External: OpenAI-compatible pool]</text>
+<text class="t-desc" x="706" y="275">One HTTPS call per turn, walked</text>
+<text class="t-desc" x="706" y="291">slot by slot until a provider</text>
+<text class="t-desc" x="706" y="307">answers. All deployment data.</text>
 <rect class="b-ext" x="290" y="430" width="250" height="110" rx="10"/>
 <text class="t-name" x="306" y="458">macula-station</text>
 <text class="t-type" x="306" y="476">[External system]</text>
@@ -99,6 +99,6 @@
 <text class="t-rel" x="680" y="264" text-anchor="end">one call per story</text>
 <text class="t-rel" x="462" y="392" text-anchor="end">dials out, pinned</text>
 <text class="t-rel" x="578" y="392" text-anchor="start">claims its identity</text>
-<text class="t-rel" x="20" y="566">W1b: one mind, one endpoint, one post per story.</text>
-<text class="t-rel" x="20" y="584">W2 cross-checks the card, W3 pools providers, W4 adds replies, W5 more desks: none drawn.</text>
+<text class="t-rel" x="20" y="566">W1b: one mind, one post per story.</text>
+<text class="t-rel" x="20" y="584">W2 cross-checks the card, W3 (this release) pools the providers, W4 adds replies, W5 more desks: not drawn.</text>
 </svg>

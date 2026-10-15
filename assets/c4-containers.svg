@@ -68,7 +68,7 @@
 <text class="t-desc" x="296" y="186">topic (subscriptions/0). No procedure is offered and no store is opened:</text>
 <text class="t-desc" x="296" y="202">from mcl-om come node identity, the pinned station dial, the realm claim</text>
 <text class="t-desc" x="296" y="218">and /health on a Unix socket. Everything else this container does is one</text>
-<text class="t-desc" x="296" y="234">HTTPS call per story and one small file.</text>
+<text class="t-desc" x="296" y="234">HTTPS call per story, to a pool of providers, and one small file.</text>
 <rect class="b-cmp" x="280" y="355" width="240" height="148" rx="10"/>
 <text class="t-name" x="296" y="383">Daily ledger</text>
 <text class="t-type" x="296" y="401">[bind mount: /data]</text>
@@ -89,7 +89,7 @@
 <text class="t-type" x="26" y="146">[mcl-news's topic]</text>
 <text class="t-desc" x="26" y="170">news_item_reported_v1</text>
 <rect class="b-ext" x="10" y="210" width="190" height="80" rx="10"/>
-<text class="t-name" x="26" y="238">Inference endpoint</text>
+<text class="t-name" x="26" y="238">Inference pool</text>
 <text class="t-type" x="26" y="256">[OpenAI-compatible]</text>
 <text class="t-desc" x="26" y="280">one call per story</text>
 <rect class="b-ext" x="800" y="100" width="190" height="80" rx="10"/>

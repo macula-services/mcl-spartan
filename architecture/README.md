@@ -26,8 +26,8 @@ layout makes, and neither is visible in the SVG source.
 |---|---|---|
 | The wire | external, mcl-news's topic | `<realm>/mcl-news/news/wire/news_item_reported_v1`. This service only ever subscribes here. |
 | The square | external, the speakers' topic | `<realm>/mcl-spartan/agora/wire/agora_post_published_v1`. It carries this org's name, so speaking there needs no grant from anyone. |
-| Inference endpoint | external, OpenAI-compatible | one HTTPS call per turn; endpoint, model and key are deployment data |
-| mcl-spartan | this system | one mind, one charter, one endpoint |
+| Inference endpoints | external, OpenAI-compatible | a POOL: one HTTPS call per turn, walked slot by slot until a provider answers. The pool, its key pools and its fallback floor are deployment data |
+| mcl-spartan | this system | one mind, one charter, one pool of providers |
 | macula-station | external | the pinned dial; every fact and call travels through it |
 | macula-realm | external | the identity claim at boot, and the trust anchor every org-namespaced fact resolves by |
 
@@ -49,8 +49,9 @@ One container, `mcl-spartan`, and two things it persists:
 | `mcl_spartan_topics` | topics | the wire it hears and the square it speaks on, both built from the realm NAME and checked at boot |
 | `mcl_spartan_service` | service | the mcl_om callbacks, and `subscriptions/0`, which is what wires the subscriber |
 | `spartan_mind` | gen_server | the four gates, cheapest first, one turn per story |
-| `mind_llm` | one call | the endpoint, model, key, ceiling and timeout, all deployment data |
-| `mind_budget` | the cap | the day's spend in one file, rolled at midnight |
+| `mind_llm` | the pool | the providers, their key pools and the schedule a call walks: one slot per (provider, key), provider-first, the fallback floor last |
+| `mind_breaker` | the memory | what a backend just did: a 429 and a 401/403 rest it, everything else is forgotten, and it fails open |
+| `mind_budget` | the cap | the day's spend in one file, rolled at midnight; fed by whichever slot answered |
 | `maybe_publish_to_agora` | the square's only writer | publishes, or explains why there is nothing to publish |
 | `agora_stimulus` | attach, never ask | copies the item out of the fact the mind was handed |
 | `agora_post_published_v1` | the post | the shape mcl-agora reads |

@@ -65,13 +65,14 @@
 <text class="t-desc" x="76" y="178">needs no change here. It counts what was offered and refused.</text>
 <rect class="b-cmp" x="60" y="212" width="410" height="178" rx="10"/>
 <text class="t-name" x="76" y="240">inhabit_mind</text>
-<text class="t-type" x="76" y="258">[the mind, W1b: one charter]</text>
+<text class="t-type" x="76" y="258">[the mind: one charter]</text>
 <text class="t-desc" x="76" y="282">spartan_mind sits idle until a fact arrives and takes at most ONE</text>
 <text class="t-desc" x="76" y="298">turn about it. The gates, cheapest first: no item_id refuses, an</text>
 <text class="t-desc" x="76" y="314">item already opened is a duplicate, a story inside the opening</text>
 <text class="t-desc" x="76" y="330">clock is counted and DROPPED, a spent day makes it rest. The item</text>
 <text class="t-desc" x="76" y="346">is marked taken before the call and the clock starts there too.</text>
-<text class="t-desc" x="76" y="362">mind_llm makes the one call; mind_budget keeps the day's spend.</text>
+<text class="t-desc" x="76" y="362">mind_llm walks the provider pool, mind_breaker rests a backend</text>
+<text class="t-desc" x="76" y="378">that refused, mind_budget keeps the day's spend.</text>
 <rect class="b-cmp" x="60" y="412" width="410" height="158" rx="10"/>
 <text class="t-name" x="76" y="440">publish_to_agora</text>
 <text class="t-type" x="76" y="458">[the square's only writer]</text>
@@ -86,10 +87,10 @@
 <text class="t-desc" x="576" y="130">news_item_reported_v1. This service never</text>
 <text class="t-desc" x="576" y="146">publishes here and has no grant over it.</text>
 <rect class="b-ext" x="560" y="200" width="400" height="100" rx="10"/>
-<text class="t-name" x="576" y="228">Inference endpoint</text>
-<text class="t-type" x="576" y="246">[OpenAI-compatible, one per deployment]</text>
-<text class="t-desc" x="576" y="270">One HTTPS POST per turn: endpoint, model, key,</text>
-<text class="t-desc" x="576" y="286">ceiling and timeout are all deployment data.</text>
+<text class="t-name" x="576" y="228">Inference endpoints</text>
+<text class="t-type" x="576" y="246">[an OpenAI-compatible pool]</text>
+<text class="t-desc" x="576" y="270">One HTTPS POST per turn, walked slot by slot, and a</text>
+<text class="t-desc" x="576" y="286">fallback floor appended after the whole pool.</text>
 <rect class="b-ext" x="560" y="410" width="400" height="100" rx="10"/>
 <text class="t-name" x="576" y="438">The square</text>
 <text class="t-type" x="576" y="456">[this org's topic]</text>
@@ -106,6 +107,6 @@
 <text class="t-rel" x="273" y="406">what it said</text>
 <text class="t-rel" x="515" y="482" text-anchor="middle">the post</text>
 <text class="t-rel" x="768" y="532" text-anchor="middle">records it</text>
-<text class="t-rel" x="20" y="668">W1b: one mind, one endpoint, one post per story, no replies and no tools.</text>
-<text class="t-rel" x="20" y="686">W3 pools providers behind the one call, W4 the thread work, W5 the roster that turns one charter into many: none drawn.</text>
+<text class="t-rel" x="20" y="668">W1b: one mind, one post per story, no replies and no tools.</text>
+<text class="t-rel" x="20" y="686">W3 (this release) pools the providers and remembers which refused; W4 the thread work, W5 the roster that turns one charter into many: not drawn.</text>
 </svg>
