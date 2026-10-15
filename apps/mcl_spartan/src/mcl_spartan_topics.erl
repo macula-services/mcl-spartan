@@ -14,12 +14,18 @@
 -module(mcl_spartan_topics).
 
 -export([realm_name/0, check_realm_name/0, check_realm_name/2]).
--export([news_wire_topics/0, news_wire_topic/1]).
+-export([news_source/0, news_wire_topics/0, news_wire_topic/1]).
 -export([square_topics/0, square_topic/1]).
 
 -define(APP, mcl_spartan).
 -define(SOURCE, <<"mcl-news">>).
 -define(SPEAKERS, <<"mcl-spartan">>).
+
+%% @doc The org whose admitted nodes are the only ones a mind hears the news
+%% from (`mcl_om:org_member/2').
+-spec news_source() -> binary().
+news_source() ->
+    ?SOURCE.
 
 %% @doc The news facts a mind listens to. One shape on one topic today; the
 %% list is the seam a second source arrives through.

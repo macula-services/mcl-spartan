@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.1 (2026-10-15)
+
+**Only mcl-news is heard.** macula verifies who signed a fact, not who may
+publish on the topic, so any node in the realm could hand the mind a story to
+post about. W2 of the agora walking skeleton (macula-services/mcl-agora#1,
+macula-io/macula-portal#59).
+
+- The wire subscriber asks `mcl_om:org_member(<<"mcl-news">>, Publisher)` about
+  every fact before it reaches the mind. A node the realm says is not mcl-news
+  is counted (`not_the_news_source`) and dropped; a publisher that could not be
+  checked is counted (`unchecked`) and dropped too, never trusted. A publication
+  without a verified publisher is refused before any lookup.
+- Counted, not logged per fact: a stranger publishing in a loop must not become
+  this service's log volume.
+- `mcl_om` floor `~> 0.41` (`org_member/2` and its cache).
+
 ## 0.2.0 (2026-10-15)
 
 **A rate-limited key no longer silences the mind.** One endpoint was a single

@@ -238,10 +238,16 @@ a_slow_turn_does_not_hold_the_wire() ->
                     timer:sleep(1000),
                     {ok, #{body => <<"A slow post.">>, tokens => 5}}
                 end),
+    meck:new(mcl_om, [passthrough, no_link, non_strict]),
+    meck:expect(mcl_om, org_member, 2, {ok, 1}),
     Started = erlang:monotonic_time(millisecond),
-    {noreply, Wire} = on_news_item_reported_maybe_open_a_turn:handle_event(
-                        <<"io.macula/mcl-news/news/wire/news_item_reported_v1">>,
-                        fact(<<"j1">>), #{}, #{offered => 0, refused => 0}),
+    {noreply, Wire} = try
+                          on_news_item_reported_maybe_open_a_turn:handle_event(
+                            <<"io.macula/mcl-news/news/wire/news_item_reported_v1">>,
+                            fact(<<"j1">>), #{publisher => <<5:256>>, publisher_verified => true},
+                            #{offered => 0, refused => 0})
+                      after meck:unload(mcl_om)
+                      end,
     Waited = erlang:monotonic_time(millisecond) - Started,
     ?assertEqual(#{offered => 1, refused => 0}, Wire),
     ?assert(Waited < 800),
