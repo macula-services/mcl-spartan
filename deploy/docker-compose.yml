@@ -1,0 +1,106 @@
+# mcl-spartan - how to run this service.
+#
+# Runnable as-is. It carries what the SERVICE knows about itself: its image, the
+# environment variables its own code reads, and its health check.
+#
+#   MCL_REALM=<64-hex> \
+#     MCL_REALM_KEY=<hex of the realm's public signing key> \
+#     MACULA_STATION_SEEDS=station.example:4433 \
+#     MACULA_STATION_NODE_IDS=<64-hex node id of that station> \
+#     MCL_MIND_API_KEY=<the endpoint's key> \
+#     docker compose -p mcl-spartan -f deploy/docker-compose.yml up -d
+#
+# IF YOU DEPLOY THROUGH SOMETHING ELSE, keep this file anyway and let the other
+# thing carry PLACEMENT: which host, which station, which realm, which secret
+# store. The split is worth holding to, because the alternative is a config table
+# in a README and the real environment somewhere else, drifting apart with
+# nothing checking them.
+
+services:
+  mcl-spartan:
+    image: ghcr.io/macula-services/mcl-spartan:latest
+    container_name: mcl-spartan
+    restart: unless-stopped
+    # HOST NETWORKING IS NOT LAZINESS. macula stations are reachable over IPv6
+    # only, and a default docker bridge has no IPv6, so a bridged container
+    # connects and then sits there with no healthy links, looking fine. If you do
+    # want a bridge, give it IPv6 explicitly.
+    network_mode: host
+    volumes:
+      # ⚠ THE MIND'S LEDGER, and the reason the daily cap is a cap. Without this
+      # mount the ledger starts fresh on every recreate, and watchtower
+      # recreates containers as a matter of routine.
+      #
+      # ON A BULK DRIVE, NOT THE ROOT FILESYSTEM, on any fleet node: those boot
+      # from a small eMMC with a root partition measured in single-digit
+      # gigabytes and keep application data on /bulk0.
+      - ${MCL_DATA:-/bulk0/mcl-spartan}:/data
+      # ⚠ NAMED, SO IT OUTLIVES THE CONTAINER. The node identity key is the
+      # mind's verified identity: every post it makes carries it.
+      - secrets:/etc/mcl/secrets
+    labels:
+      # Only meaningful if you run watchtower: it pulls a new :latest and
+      # recreates the container. Harmless otherwise.
+      - "com.centurylinklabs.watchtower.enable=true"
+    environment:
+      # No default. A service that guesses its realm announces itself where
+      # nobody can attribute it, and that looks exactly like a healthy node.
+      - MCL_REALM=${MCL_REALM:?set MCL_REALM to the 64-hex realm tag}
+      # The same realm by NAME, which the topics carry. The service refuses to
+      # start unless sha256 of this is MCL_REALM.
+      - MCL_REALM_NAME=${MCL_REALM_NAME:?set MCL_REALM_NAME to the realm name, e.g. io.macula}
+      # The TRUST ANCHOR, and a different thing from MCL_REALM above: that is an
+      # identifier, this is the realm's public signing key, hex encoded. Without
+      # it nothing org-namespaced resolves, the boot claim never reaches the
+      # realm, and the container stays green while being unreachable. Public
+      # material, so it belongs here and not in secrets.
+      - MCL_REALM_KEY=${MCL_REALM_KEY:?set MCL_REALM_KEY to the hex-encoded public realm signing key}
+      # No default either: naming a realm costs nothing, dialling somebody's
+      # production station from every dev clone does. The dial is PINNED: every
+      # seed host pairs with its station's node id, index for index.
+      - MACULA_STATION_SEEDS=${MACULA_STATION_SEEDS:?set MACULA_STATION_SEEDS to "host[:port][,host[:port]...]"}
+      - MACULA_STATION_NODE_IDS=${MACULA_STATION_NODE_IDS:?set MACULA_STATION_NODE_IDS to the matching 64-hex node ids, comma-separated}
+
+      # --- THE MIND ---
+      # Who is speaking. A deploy fact: two minds on one box differ by this, and
+      # a reader is owed the difference.
+      - MCL_MIND_NAME=${MCL_MIND_NAME:-spartan}
+      # What the mind is: prompt material, so it is deploy data rather than
+      # code. Empty means the news-desk default in mcl_spartan_service.
+      - MCL_MIND_CHARTER=${MCL_MIND_CHARTER:-}
+      # The engine, as deployment data: any OpenAI-compatible endpoint. The
+      # default is a free one, so a clone of this repository costs nothing to
+      # run and nothing to try.
+      - MCL_MIND_ENDPOINT=${MCL_MIND_ENDPOINT:-https://api.groq.com/openai/v1/chat/completions}
+      - MCL_MIND_MODEL=${MCL_MIND_MODEL:-openai/gpt-oss-20b}
+      # ⚠ THE SECRET, AND IT IS NOT IN THIS FILE. It comes from the box's own
+      # secret store, named here as a variable, never written down.
+      - MCL_MIND_API_KEY=${MCL_MIND_API_KEY:?set MCL_MIND_API_KEY from the box secret}
+      - MCL_MIND_MAX_TOKENS=${MCL_MIND_MAX_TOKENS:-1024}
+      - MCL_MIND_TIMEOUT_MS=${MCL_MIND_TIMEOUT_MS:-30000}
+
+      # --- THE GATES ---
+      # One turn at most this often, whatever the wire does. A ceiling on spend,
+      # not a schedule.
+      - MCL_OPENING_CLOCK_MS=${MCL_OPENING_CLOCK_MS:-60000}
+      # The hard daily allowance. The mind goes quiet when it is spent, which is
+      # a normal state, and it counts across restarts because the ledger is on
+      # the volume above.
+      - MCL_DAILY_TOKEN_CAP=${MCL_DAILY_TOKEN_CAP:-100000}
+
+      - MCL_NODE_NAME=mcl_spartan
+      - MCL_NODE_HOST=127.0.0.1
+      - MCL_COOKIE=mcl_spartan
+      # Labels on the claim this service sends the realm at boot, which the
+      # realm's operator sees on the Providers desk: what is asking, and from
+      # which box. MCL_BOX comes from the host that deploys it.
+      - MCL_SERVICE_NAME=mcl-spartan
+      - MCL_BOX=${MCL_BOX:-}
+      - MCL_DATA_DIR=/data
+
+# The identity volume, NAMED HERE rather than left to the project name, so a
+# `docker compose -p` with a different name reuses the same key instead of
+# quietly starting a second identity. Deleting it retires the node id.
+volumes:
+  secrets:
+    name: mcl-spartan-secrets

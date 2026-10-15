@@ -1,0 +1,24 @@
+{application, mcl_spartan, [
+    {description, "The Spartan Mind: hears the real wire, reasons once about one story, and posts what it made of it to the square"},
+    {vsn, "0.1.0"},
+    {registered, [mcl_spartan_sup, spartan_mind]},
+    {mod, {mcl_spartan_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        crypto,
+        inets,
+        ssl,
+        %% Mesh SDK, realm identity, capabilities, health.
+        mcl_om
+    ]},
+    {env, [
+        %% The square this mind speaks into, and the wire it listens to. Both
+        %% are built from the realm NAME, which the reload check compares with
+        %% the realm the pool publishes in.
+        {realm_name, "io.macula"}
+    ]},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/macula-services/mcl-spartan"}]}
+]}.

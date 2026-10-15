@@ -1,0 +1,113 @@
+%% Substituted by relx at boot; every ${VAR} must resolve or the node will not
+%% start with a malformed term. That is the correct failure: a service with a
+%% half-configured realm announces itself where nobody can attribute it, which
+%% looks exactly like a healthy node.
+[
+    {mcl_spartan, [
+        %% The realm NAME the topics carry (io.macula); MCL_REALM is its sha256
+        %% tag. The service refuses to start unless they agree.
+        {realm_name, "${MCL_REALM_NAME}"},
+
+        %% ======================================================================
+        %% THE MIND
+        %% ======================================================================
+
+        %% What this mind signs its posts as. A deploy fact, not a model's
+        %% invention: two minds on one box differ by exactly this, and a reader
+        %% is owed the difference.
+        {mind_name, "${MCL_MIND_NAME}"},
+
+        %% The charter: what this mind reads and what it is for. Empty means the
+        %% default in mcl_spartan_service, which is a news desk. It is PROMPT
+        %% MATERIAL, so a deploy that wants a different mind writes different
+        %% words here rather than a different release.
+        {charter, "${MCL_MIND_CHARTER}"},
+
+        %% The engine, as deployment data: an OpenAI-compatible endpoint, a
+        %% model, and the name of the environment variable holding the key.
+        %% Nothing here names a provider, so swapping one is an env change.
+        {mind_endpoint, "${MCL_MIND_ENDPOINT}"},
+        {mind_model,    "${MCL_MIND_MODEL}"},
+
+        %% The key itself is NOT here. mind_llm reads MCL_MIND_API_KEY from the
+        %% environment, because a box secret stays on the box and out of any
+        %% config term that could be dumped.
+
+        %% One turn's ceiling, in tokens out.
+        {mind_max_tokens, ${MCL_MIND_MAX_TOKENS}},
+
+        %% How long to wait for the endpoint. Longer than a fast provider
+        %% answers, shorter than the opening clock, so a slow endpoint cannot
+        %% hold the mind past its own gate.
+        {mind_timeout_ms, ${MCL_MIND_TIMEOUT_MS}},
+
+        %% The opening clock: one turn at most this often, whatever the wire
+        %% does. This is a ceiling on spend, not a schedule.
+        {opening_clock_ms, ${MCL_OPENING_CLOCK_MS}},
+
+        %% The hard daily allowance. Stored beside the mind's own ledger, so a
+        %% restart does not hand it a fresh one.
+        {daily_token_cap, ${MCL_DAILY_TOKEN_CAP}},
+
+        %% Where that ledger lives. A small file, not a store: see mind_budget.
+        {data_dir, "${MCL_DATA_DIR}"}
+    ]},
+    {mcl_om, [
+        %% Without this, mcl_om_identity:load_node_key/0 returns `undefined'
+        %% forever and identity_key/0 stays {error, no_identity_key}, so a
+        %% service that publishes facts does so unsigned, or not at all.
+        %% ON A PERSISTENT VOLUME: this key is the mind's identity on the mesh,
+        %% the verified publisher of every post it makes.
+        {identity_key_path, "/etc/mcl/secrets/identity.key"},
+
+        %% /health on a Unix socket only (mcl_om 0.39): no TCP health listener
+        %% and no health port bound on the host.
+        {health_socket,     "/run/mcl/health.sock"},
+
+        {capability_topic,  <<"_mesh.cap.">>},
+
+        %% One org per service, named after the repo: the org that owns the
+        %% square this mind speaks on, and the org segment of every topic it
+        %% publishes to. Fixed, not deploy config.
+        {org,               <<"mcl-spartan">>},
+
+        %% THE REALM IS AN APPLICATION ENV, NOT A SHELL VARIABLE, and this file
+        %% is the only place the two meet. mcl_om_identity:realm() reads
+        %% application:get_env(mcl_om, realm); exporting MCL_REALM in the shell
+        %% and expecting that to be enough leaves the pool with no realm.
+        {realm,             <<"${MCL_REALM}">>},
+
+        %% ⚠ THE TRUST ANCHOR, AND IT IS NOT OPTIONAL. MCL_REALM above is an
+        %% IDENTIFIER (sha256 of the realm name); this is the realm's public
+        %% SIGNING KEY, 64-hex-per-32-bytes. mcl_om decodes it and pins it as
+        %% macula:connect/2's `realm_trust'.
+        %%
+        %% Without it every org-namespaced advertisement is refused with
+        %% `no_realm_key', direct dial answers `{unresolved,
+        %% no_trusted_advertisement}', and the boot claim never reaches the
+        %% realm: no pending row, no delegation, nothing callable. The node
+        %% stays green and answers /health throughout, which is why mcl_om now
+        %% refuses to start a pool without it.
+        %%
+        %% Public material. It is the half everyone verifies against, not a
+        %% secret, and it does not belong in the secrets volume.
+        {realm_key,         <<"${MCL_REALM_KEY}">>}
+    ]},
+    %% ==========================================================================
+    %% THE PQ CRYPTO PROFILE, WITHOUT WHICH THIS NODE DOES NOT PEER
+    %% ==========================================================================
+    %%
+    %% ⚠ MANDATORY. The macula app starts before the service reads anything, and
+    %% without this block it boots on the classical profile while every PQ
+    %% station closes the CONNECT/HELLO handshake as puzzle_invalid, forever and
+    %% silently. A puzzle-8 identity key and the pq_hybrid profile every wire
+    %% signature is checked under. mcl_om is a library; each service's own
+    %% release carries this.
+    %%
+    %% ⚠ NO `puzzle_difficulty' HERE. macula 12 makes it one constant for the
+    %% fleet and REFUSES a node that sets its own.
+    {macula, [
+        {crypto_profile, pq_hybrid}
+    ]},
+    {kernel, [{logger_level, info}]}
+].

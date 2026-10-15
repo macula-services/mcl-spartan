@@ -1,0 +1,11 @@
+## Node identity and runtime flags for mcl_spartan.
+-name ${MCL_NODE_NAME}@${MCL_NODE_HOST}
+-setcookie ${MCL_COOKIE}
+
++K true
+
+## Async thread pool. THIS SERVICE DOES REAL PORT I/O: every turn is one HTTPS
+## request, and httpc runs those on this pool, so the default of 1 would
+## serialize a mind's turns behind each other. `+A 8' is still an order of
+## magnitude below the schedulers, which is the resource that matters here.
++A 8
