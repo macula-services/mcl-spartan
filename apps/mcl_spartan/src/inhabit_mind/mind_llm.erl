@@ -151,7 +151,13 @@ reason(Charter, Prompt) ->
 reason_with(Messages) ->
     case schedule() of
         []    -> {error, no_backend, 0};
-        Slots -> walk(Messages, Slots, 1)
+        %% The turn is named once, here, and every slot of it carries the name.
+        %% This is the only place that knows where a turn begins, and the argos
+        %% record needs it: the schedule holds one slot per (provider, key), so a
+        %% provider with several keys walks the same {Provider, Model} pair more
+        %% than once inside this one turn, and counting those as separate
+        %% failures would make one bad moment look like a run of them.
+        Slots -> walk(Messages, Slots, 1, erlang:unique_integer([monotonic, positive]))
     end.
 
 %% @doc What this mind is configured to think with, for /health and the logs.
@@ -355,27 +361,27 @@ keys(#{keyenv := Env}) ->
 %% one provider configured that leaves the breaker dead exactly where it matters
 %% most, and a one-provider pool is what is live today: a rate limit would be
 %% rediscovered on every single turn. This records it like any other failure.
-walk(Messages, [{Config, Key}], _N) ->
+walk(Messages, [{Config, Key}], _N, Turn) ->
     case once(Config, body(Config, Messages), Key) of
         {ok, _Reply} = Answered ->
             answered(Config, Answered);
         {error, Why, Tokens} ->
-            ok = failed(Config, Why),
+            ok = failed(Config, Why, Turn),
             logger:notice("[mind_llm] ~s failed on the last slot (~p); "
                           "schedule exhausted, this turn is lost", [label(Config), Why]),
             {error, {all_backends_exhausted, label(Config), Why}, Tokens}
     end;
-walk(Messages, [{Config, Key} | Rest], N) ->
+walk(Messages, [{Config, Key} | Rest], N, Turn) ->
     case once(Config, body(Config, Messages), Key) of
         {ok, _Reply} = Answered ->
             answered(Config, Answered);
         {error, Why, Tokens} ->
-            ok = failed(Config, Why),
+            ok = failed(Config, Why, Turn),
             Delay = pause_before(Rest, Config, N),
             logger:info("[mind_llm] ~s failed (~p); next slot in ~bms",
                         [label(Config), Why, Delay]),
             sleep(Delay),
-            charged(walk(Messages, Rest, N + 1), Tokens)
+            charged(walk(Messages, Rest, N + 1, Turn), Tokens)
     end.
 
 %% The engine travels out with the answer, because THIS is the only place that
@@ -393,10 +399,12 @@ answered(Config, {ok, Reply}) ->
 %% different memories of it: the breaker, which is keyed on the provider because
 %% quota is, and the argos record, which is keyed on the model because liveness
 %% is. Both are told from here, where the attempt actually happened, so neither
-%% can be told about a slot that was never tried.
-failed(Config, Why) ->
+%% can be told about a slot that was never tried. The turn travels on with it,
+%% because the argos record counts a pair's failures once per turn: several keys
+%% of one provider is one backend seen several times, not several turns.
+failed(Config, Why, Turn) ->
     _ = mind_breaker:failed(Config, Why),
-    _ = mind_argos:failed(provider(Config), model_of(Config), Why),
+    _ = mind_argos:failed(provider(Config), model_of(Config), Why, Turn),
     ok.
 
 %% The provider by its configured name and the model it was asked for, both as

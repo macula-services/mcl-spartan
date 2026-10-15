@@ -33,7 +33,7 @@
 %%% mind's own experience, not of the provider's state.
 -module(mind_argos).
 
--export([succeeded/2, failed/3, report/0]).
+-export([succeeded/2, failed/4, report/0]).
 
 -define(TABLE, mind_argos).
 %% ⚠ NOT ?FILE: Erlang predefines ?FILE as the source path, so redefining it is
@@ -50,28 +50,49 @@
 -type key()      :: {binary(), binary()}.
 -type class()    :: gone | timeout | unreachable | rate_limited | credential
                   | server | parse | other.
+%% A name for one turn of the mind's own reasoning, handed in by the walk. Opaque
+%% here: all this module does with it is ask whether two failures happened in the
+%% same one.
+-type turn()     :: integer().
+%% `consecutive' counts TURNS, not attempts, and `turn' is the last one that
+%% counted, which is what keeps the repeats of a single turn from being read as a
+%% run of them.
 -type record_()  :: #{last_success_at := integer() | undefined,
                       last_failure_at := integer() | undefined,
                       class := class() | undefined,
                       consecutive := non_neg_integer(),
+                      turn := turn() | undefined,
                       told := boolean()}.
 
 -export_type([class/0]).
 
 %% @doc A slot answered. That is the whole of it, and it clears the run.
+%%
+%% The turn marker is cleared with it, and that is not bookkeeping: a failure
+%% after a success is the first of a NEW run even when it lands in the same turn,
+%% and leaving the marker behind would have it counted as a repeat of a run that
+%% has already ended.
 -spec succeeded(binary(), binary()) -> ok.
 succeeded(Provider, Model) ->
     _ = changed(key(Provider, Model),
-                fun(Seen) -> Seen#{last_success_at => now_s(), consecutive => 0, told => false} end),
+                fun(Seen) -> Seen#{last_success_at => now_s(), consecutive => 0,
+                                   turn => undefined, told => false} end),
     ok.
 
-%% @doc A slot failed, with whatever mind_llm said about it. The class is read
-%% out of that term here rather than at the call site, so the two ends cannot
-%% disagree about what a 410 is.
--spec failed(binary(), binary(), term()) -> ok.
-failed(Provider, Model, Why) ->
+%% @doc A slot failed, with whatever mind_llm said about it and the turn it
+%% failed in. The class is read out of that term here rather than at the call
+%% site, so the two ends cannot disagree about what a 410 is.
+%%
+%% ⚠ THE TURN IS THE UNIT AND THE ATTEMPT IS NOT. The schedule carries one slot
+%% per (provider, key), so a provider with three keys walks the same
+%% {Provider, Model} pair three times in ONE turn: a single 503 moment would
+%% otherwise be counted three times and said out loud as "has failed 3 turns in a
+%% row", which is a lie a reader would believe. The turn is what tells the
+%% repeats of one moment from a run of them, and only the walk knows it.
+-spec failed(binary(), binary(), term(), turn()) -> ok.
+failed(Provider, Model, Why, Turn) ->
     Key = key(Provider, Model),
-    Record = changed(Key, fun(Seen) -> failed_seen(Seen, classify(Why)) end),
+    Record = changed(Key, fun(Seen) -> failed_seen(Seen, classify(Why), Turn) end),
     loud(Key, Record).
 
 %% @doc The record as it stands, oldest key first, for the mind's own report.
@@ -86,10 +107,29 @@ report() ->
 -spec key(binary(), binary()) -> key().
 key(Provider, Model) -> {Provider, Model}.
 
-failed_seen(Seen, Class) ->
+%% What a failure does to the record. The count moves once per TURN; everything
+%% else is written fresh, because a second key of the same provider failing in the
+%% same turn is the same pair failing again and the class it failed with is what
+%% the mind last saw of it.
+failed_seen(Seen, Class, Turn) ->
     Seen#{last_failure_at => now_s(),
           class => Class,
-          consecutive => maps:get(consecutive, Seen) + 1}.
+          turn => Turn,
+          consecutive => counted(maps:get(turn, Seen, undefined) =:= Turn, Seen),
+          told => told(Seen, Class)}.
+
+counted(true, Seen)  -> maps:get(consecutive, Seen);
+counted(false, Seen) -> maps:get(consecutive, Seen) + 1.
+
+%% The latch is what makes one outage one line rather than one per turn, and a
+%% success clears it because the outage ended. It is cleared here as well, on the
+%% TRANSITION into gone and only there: a run of 5xx says its piece and latches,
+%% and a 410 arriving after it would otherwise never say GONE, which is precisely
+%% the silence this module exists to end. Only the transition, though, or a model
+%% that has been gone for an hour would be one line per turn, which is the noise
+%% the latch is for.
+told(Seen, Class) ->
+    maps:get(told, Seen) andalso not (Class =:= gone andalso maps:get(class, Seen) =/= gone).
 
 row({Provider, Model}, Seen) ->
     #{provider => Provider,
@@ -131,6 +171,7 @@ gained(Remembered) ->
       last_failure_at => maps:get(last_failure_at, Remembered, undefined),
       class => maps:get(class, Remembered, undefined),
       consecutive => 0,
+      turn => undefined,
       told => false}.
 
 %%====================================================================
@@ -141,8 +182,13 @@ gained(Remembered) ->
 %% a bad moment, it is a model that does not exist any more. A line per turn
 %% forever would be the noise the ledger's own notice avoids, and the run resets
 %% on the next answer, so this is a line per outage rather than per attempt.
+%%
+%% The GONE line names the second thing a 404 can mean, because the two have the
+%% same fix and the mind cannot tell them apart from here: a retired model id and
+%% a base path that lost its version segment look identical from the far end.
 loud(Key, #{class := gone, told := false} = Record) ->
-    say(Key, Record, "is GONE (404 or 410) and will waste a call on every turn");
+    say(Key, Record, "is GONE (404 or 410: the model is not served any more, or the "
+                     "endpoint path is wrong) and will waste a call on every turn");
 loud(Key, #{consecutive := N, told := false} = Record) when N >= ?STRIKES ->
     say(Key, Record, "has failed " ++ integer_to_list(N) ++ " turns in a row");
 loud(_Key, _Record) ->

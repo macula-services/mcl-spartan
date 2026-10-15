@@ -20,8 +20,8 @@
 %% last answered, and it stops counting.
 a_success_is_dated_and_clears_the_run_test() ->
     fresh(),
-    ok = mind_argos:failed(<<"nvidia">>, <<"m1">>, {http_status, 500, <<>>}),
-    ok = mind_argos:failed(<<"nvidia">>, <<"m1">>, {http_status, 500, <<>>}),
+    ok = mind_argos:failed(<<"nvidia">>, <<"m1">>, {http_status, 500, <<>>}, 1),
+    ok = mind_argos:failed(<<"nvidia">>, <<"m1">>, {http_status, 500, <<>>}, 2),
     ok = mind_argos:succeeded(<<"nvidia">>, <<"m1">>),
     Seen = seen(<<"nvidia">>, <<"m1">>),
     ?assertEqual(0, maps:get(consecutive, Seen)),
@@ -37,9 +37,9 @@ a_success_is_dated_and_clears_the_run_test() ->
 %% limits and credentials.
 a_missing_model_is_recorded_as_gone_test() ->
     fresh(),
-    ok = mind_argos:failed(<<"nvidia">>, <<"retired">>, {http_status, 404, <<"not found">>}),
+    ok = mind_argos:failed(<<"nvidia">>, <<"retired">>, {http_status, 404, <<"not found">>}, 1),
     ?assertEqual(gone, maps:get(class, seen(<<"nvidia">>, <<"retired">>))),
-    ok = mind_argos:failed(<<"cerebras">>, <<"also-retired">>, {http_status, 410, <<"gone">>}),
+    ok = mind_argos:failed(<<"cerebras">>, <<"also-retired">>, {http_status, 410, <<"gone">>}, 1),
     ?assertEqual(gone, maps:get(class, seen(<<"cerebras">>, <<"also-retired">>))).
 
 %% The classes the pool already talks in, so the two records can be read side by
@@ -63,7 +63,7 @@ every_failure_is_classified_in_the_pool_s_own_vocabulary_test() ->
 
 class_after(Why) ->
     Model = unicode:characters_to_binary(io_lib:format("~p", [Why])),
-    ok = mind_argos:failed(<<"p">>, Model, Why),
+    ok = mind_argos:failed(<<"p">>, Model, Why, 1),
     maps:get(class, seen(<<"p">>, Model)).
 
 %% One provider, several models: the record is keyed on the PAIR, because that
@@ -71,7 +71,7 @@ class_after(Why) ->
 %% about its others, and this is the whole reason the breaker could not hold it.
 one_model_going_does_not_touch_its_neighbours_test() ->
     fresh(),
-    ok = mind_argos:failed(<<"nvidia">>, <<"m1">>, {http_status, 410, <<>>}),
+    ok = mind_argos:failed(<<"nvidia">>, <<"m1">>, {http_status, 410, <<>>}, 1),
     ok = mind_argos:succeeded(<<"nvidia">>, <<"m2">>),
     ?assertEqual(gone, maps:get(class, seen(<<"nvidia">>, <<"m1">>))),
     ?assertEqual(undefined, maps:get(class, seen(<<"nvidia">>, <<"m2">>))),
@@ -85,9 +85,9 @@ a_model_that_is_gone_is_said_loudly_test() ->
     fresh(),
     Lines = with_logger(fun() ->
                             ok = mind_argos:failed(<<"nvidia">>, <<"retired">>,
-                                                   {http_status, 404, <<>>}),
+                                                   {http_status, 404, <<>>}, 1),
                             ok = mind_argos:failed(<<"nvidia">>, <<"retired">>,
-                                                   {http_status, 404, <<>>})
+                                                   {http_status, 404, <<>>}, 2)
                         end),
     %% ONCE, at the first, and not again while it stays gone: a line per turn
     %% forever would be the noise the record exists to cut through.
@@ -97,16 +97,87 @@ a_model_that_is_gone_is_said_loudly_test() ->
     %% And it says the thing that matters: the pool still calls it.
     ?assert(match(Lines, "still calls it")).
 
+%% ⚠ THE THREE ARE THREE TURNS, and that is the whole of the assertion: the
+%% schedule holds one slot per (provider, key), so the same pair can be walked
+%% three times inside ONE turn by a provider with three keys. Counting those
+%% would say "3 turns in a row" about a single bad moment, which is the lie this
+%% test exists to stop, so the repeats within a turn are pinned separately below.
 three_failures_in_a_row_are_said_loudly_once_test() ->
     fresh(),
     Lines = with_logger(fun() ->
-                            ok = mind_argos:failed(<<"groq">>, <<"m">>, {http_status, 500, <<>>}),
-                            ok = mind_argos:failed(<<"groq">>, <<"m">>, {http_status, 500, <<>>}),
-                            ok = mind_argos:failed(<<"groq">>, <<"m">>, {http_status, 500, <<>>}),
-                            ok = mind_argos:failed(<<"groq">>, <<"m">>, {http_status, 500, <<>>})
+                            [ok = mind_argos:failed(<<"groq">>, <<"m">>, {http_status, 500, <<>>}, Turn)
+                             || Turn <- [1, 2, 3]],
+                            ok = mind_argos:failed(<<"groq">>, <<"m">>, {http_status, 500, <<>>}, 4)
                         end),
     ?assertEqual(1, length(Lines)),
     ?assert(match(Lines, "3 turns in a row")).
+
+%% ⚠ THE SAME PAIR, TRIED ONCE PER KEY, IS ONE FAILURE AND NOT THREE. This is
+%% what a provider with a key pool actually does: every_backend_once/1 builds one
+%% slot per (provider, key), so three keys walk {Provider, Model} three times in
+%% one turn. Before this was pinned, one 503 moment reached the threshold and said
+%% "has failed 3 turns in a row" while the mind had had exactly one bad turn.
+repeats_of_one_pair_within_a_turn_are_one_failure_test() ->
+    fresh(),
+    Lines = with_logger(fun() ->
+                            [ok = mind_argos:failed(<<"nvidia">>, <<"m">>, {http_status, 503, <<>>}, 7)
+                             || _ <- lists:seq(1, 3)]
+                        end),
+    ?assertEqual(1, maps:get(consecutive, seen(<<"nvidia">>, <<"m">>))),
+    %% And nothing is said: one turn is a moment, not a run.
+    ?assertEqual([], Lines).
+
+%% The turn a pair failed in is remembered, and the NEXT turn counts: a repeat
+%% inside one turn is one failure, a repeat across turns is two.
+a_failure_in_a_later_turn_counts_again_test() ->
+    fresh(),
+    ok = mind_argos:failed(<<"groq">>, <<"m">>, {http_status, 500, <<>>}, 11),
+    ok = mind_argos:failed(<<"groq">>, <<"m">>, {http_status, 500, <<>>}, 11),
+    ?assertEqual(1, maps:get(consecutive, seen(<<"groq">>, <<"m">>))),
+    ok = mind_argos:failed(<<"groq">>, <<"m">>, {http_status, 500, <<>>}, 12),
+    ?assertEqual(2, maps:get(consecutive, seen(<<"groq">>, <<"m">>))).
+
+%% A success ends the run, and the turn marker goes with it: a failure after a
+%% success is the first of a new run even when it lands in the same turn, rather
+%% than a repeat of the run that has just been cleared. The failure BEFORE the
+%% success is what makes this discriminating: without the marker being cleared,
+%% the third call here would look like the repeat of a run already ended and
+%% would leave the count at zero.
+a_failure_after_a_success_in_the_same_turn_starts_a_new_run_test() ->
+    fresh(),
+    ok = mind_argos:failed(<<"groq">>, <<"m">>, {http_status, 500, <<>>}, 9),
+    ok = mind_argos:succeeded(<<"groq">>, <<"m">>),
+    ok = mind_argos:failed(<<"groq">>, <<"m">>, {http_status, 500, <<>>}, 9),
+    ?assertEqual(1, maps:get(consecutive, seen(<<"groq">>, <<"m">>))).
+
+%% ⚠ A LATCH SPENT ON SOMETHING ELSE MUST NOT BUY SILENCE FOR THIS. Three 5xx
+%% say their piece and latch; a 410 arriving after them is a model going away,
+%% and it is the loudest fact this record has. Before this was pinned, that 410
+%% was exactly what the latch swallowed: the mind would have gone quiet about the
+%% one thing it exists to say.
+a_model_that_goes_gone_after_a_run_of_servers_is_still_said_test() ->
+    fresh(),
+    Lines = with_logger(fun() ->
+                            [ok = mind_argos:failed(<<"groq">>, <<"m">>, {http_status, 500, <<>>}, Turn)
+                             || Turn <- [1, 2, 3]],
+                            ok = mind_argos:failed(<<"groq">>, <<"m">>, {http_status, 410, <<>>}, 4)
+                        end),
+    %% Two lines: the run of servers says its piece at the third, and the 410
+    %% adds its own rather than being folded into a latch already spent.
+    ?assertEqual(2, length(Lines)),
+    ?assert(match(Lines, "GONE")),
+    ?assertEqual(gone, maps:get(class, seen(<<"groq">>, <<"m">>))).
+
+%% And only the TRANSITION is said. A model that is gone stays quiet after it has
+%% said so, or a retired id would be one line per turn forever, which is the
+%% noise the latch is there to prevent.
+a_model_that_stays_gone_is_said_once_test() ->
+    fresh(),
+    Lines = with_logger(fun() ->
+                            [ok = mind_argos:failed(<<"groq">>, <<"m">>, {http_status, 410, <<>>}, Turn)
+                             || Turn <- [1, 2, 3]]
+                        end),
+    ?assertEqual(1, length(Lines)).
 
 %% A success ends the outage, so the NEXT run of failures is a new one and is
 %% said again: a mind that went quiet for an hour should not stay quiet about
@@ -114,11 +185,11 @@ three_failures_in_a_row_are_said_loudly_once_test() ->
 a_success_lets_the_next_run_be_said_again_test() ->
     fresh(),
     Lines = with_logger(fun() ->
-                            [ok = mind_argos:failed(<<"groq">>, <<"m">>, {http_status, 500, <<>>})
-                             || _ <- lists:seq(1, 3)],
+                            [ok = mind_argos:failed(<<"groq">>, <<"m">>, {http_status, 500, <<>>}, Turn)
+                             || Turn <- [1, 2, 3]],
                             ok = mind_argos:succeeded(<<"groq">>, <<"m">>),
-                            [ok = mind_argos:failed(<<"groq">>, <<"m">>, {http_status, 500, <<>>})
-                             || _ <- lists:seq(1, 3)]
+                            [ok = mind_argos:failed(<<"groq">>, <<"m">>, {http_status, 500, <<>>}, Turn)
+                             || Turn <- [4, 5, 6]]
                         end),
     ?assertEqual(2, length(Lines)).
 
@@ -130,7 +201,7 @@ a_gone_model_does_not_rest_its_provider_test() ->
     fresh(),
     _ = catch ets:delete(mind_breaker),
     Provider = #{label => "nvidia"},
-    ok = mind_argos:failed(<<"nvidia">>, <<"retired">>, {http_status, 404, <<>>}),
+    ok = mind_argos:failed(<<"nvidia">>, <<"retired">>, {http_status, 404, <<>>}, 1),
     ?assertEqual(false, mind_breaker:resting(Provider)),
     ?assertEqual([{Provider, "k"}], mind_breaker:usable([{Provider, "k"}])).
 
@@ -143,8 +214,8 @@ a_gone_model_does_not_rest_its_provider_test() ->
 %% process that was having it.
 the_dates_survive_a_restart_and_the_counters_do_not_test() ->
     fresh(),
-    [ok = mind_argos:failed(<<"nvidia">>, <<"m">>, {http_status, 410, <<>>})
-     || _ <- lists:seq(1, 3)],
+    [ok = mind_argos:failed(<<"nvidia">>, <<"m">>, {http_status, 410, <<>>}, Turn)
+     || Turn <- [1, 2, 3]],
     Before = seen(<<"nvidia">>, <<"m">>),
     restarted(),
     After = seen(<<"nvidia">>, <<"m">>),
