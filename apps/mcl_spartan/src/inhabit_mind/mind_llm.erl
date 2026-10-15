@@ -451,7 +451,14 @@ parse(Response, RequestBytes) ->
         _:_ -> {error, {not_json, clip(Response)}, estimate(RequestBytes, <<>>)}
     end.
 
-parsed(#{<<"choices">> := [#{<<"message">> := Message} | _] = Choices} = Decoded, RequestBytes) ->
+%% ⚠ A BODY THAT IS VALID JSON AND NOT AN OBJECT IS NOT A MIND-KILLER. jsx
+%% decodes `[]' into a LIST and `null' into an atom, and the usage reader assumed
+%% an object: a `badmap' raised here runs inside the mind's own cast, so a gateway
+%% answering `[]' repeatedly would kill the mind and take everything queued
+%% behind it with it. An endpoint having a bad day costs the TURN, which the
+%% schedule fails over from, and never the mind.
+parsed(#{<<"choices">> := [#{<<"message">> := Message} | _] = Choices} = Decoded, RequestBytes)
+  when is_map(Message) ->
     content(Message, finish(Choices), Decoded, RequestBytes);
 parsed(Decoded, RequestBytes) ->
     {error, no_choice, used(Decoded, RequestBytes, <<>>)}.
@@ -479,8 +486,13 @@ finish([])                                     -> undefined.
 text(Content) when is_binary(Content) -> Content;
 text(_NotText)                        -> <<>>.
 
-used(Decoded, RequestBytes, Content) ->
-    tokens(maps:get(<<"usage">>, Decoded, undefined), RequestBytes, Content).
+%% A usage field is only readable when the body that carried it was an object.
+%% Anything else (a bare array, a bare string, a gateways's html that happened to
+%% parse) has nothing to report and falls to the estimate.
+used(Decoded, RequestBytes, Content) when is_map(Decoded) ->
+    tokens(maps:get(<<"usage">>, Decoded, undefined), RequestBytes, Content);
+used(_NotAnObject, RequestBytes, Content) ->
+    estimate(RequestBytes, Content).
 
 %% What the endpoint says it cost, or an estimate when it declines to say:
 %% characters over four, which is the usual rule of thumb for English prose and

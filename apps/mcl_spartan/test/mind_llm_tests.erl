@@ -176,6 +176,28 @@ a_body_that_is_not_json_is_estimated_test() ->
         mind_llm:reason(<<"charter">>, <<"prompt">>),
     ?assert(Tokens > 0).
 
+%% @doc ⚠ VALID JSON THAT IS NOT AN OBJECT IS NOT A MIND-KILLER. jsx decodes an
+%% array into a list and null into an atom, and reading `usage' out of either was
+%% a badmap: raised inside the mind's own cast, so a gateway answering [] would
+%% repeatedly kill the mind and take everything queued behind it with it. A turn
+%% that costs the turn is what this must be, every time.
+a_json_body_that_is_not_an_object_costs_the_turn_not_the_mind_test() ->
+    _ = with_endpoint(200, <<"[]">>),
+    {error, {all_backends_exhausted, "endpoint", no_choice}, Tokens} =
+        mind_llm:reason(<<"charter">>, <<"prompt">>),
+    ?assert(Tokens > 0).
+
+a_json_null_costs_the_turn_not_the_mind_test() ->
+    _ = with_endpoint(200, <<"null">>),
+    ?assertMatch({error, {all_backends_exhausted, "endpoint", no_choice}, _Tokens},
+                 mind_llm:reason(<<"charter">>, <<"prompt">>)).
+
+%% And the same class one level down: a choice whose message is not an object.
+a_message_that_is_not_an_object_costs_the_turn_not_the_mind_test() ->
+    _ = with_endpoint(200, jsx:encode(#{<<"choices">> => [#{<<"message">> => 5}]})),
+    ?assertMatch({error, {all_backends_exhausted, "endpoint", no_choice}, _Tokens},
+                 mind_llm:reason(<<"charter">>, <<"prompt">>)).
+
 %% @doc THE POINT OF THE CAROUSEL. A rate-limited provider does not end the
 %% turn: the next slot answers, the body that comes back is that slot's, and the
 %% tokens that reach the daily budget are the ones the answering slot reported.

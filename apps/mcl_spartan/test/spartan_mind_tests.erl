@@ -42,6 +42,7 @@ mind_test_() ->
           fun the_cap_makes_it_rest/0,
           fun the_cap_rolls_over_at_midnight/0,
           fun what_it_spent_is_on_disk/0,
+          fun a_fact_that_arrived_inside_the_clock_is_dropped_when_it_is_read/0,
           fun a_slow_turn_does_not_hold_the_wire/0]
      end}.
 
@@ -194,6 +195,34 @@ what_it_spent_is_on_disk() ->
     %% survive a restart instead of being a speed bump.
     ?assertEqual(12, maps:get(spent, mind_budget:report(mind_budget:load()))).
 
+%% @doc ⚠ THE CLOCK GATES WHEN A FACT ARRIVED, NOT WHEN IT WAS READ. A turn can
+%% now outlast the opening clock, so a fact handed over during one is read after
+%% the clock has already elapsed. Gated on the reading, it opens a turn of its
+%% own, and so does the next, and the next: one paid turn after another, which is
+%% the spend spiral the clock exists to stop, with the mailbox as its only bound.
+%%
+%% THE CLOCK HERE IS SHORTER THAN THE TURN ON PURPOSE. With a clock longer than
+%% the turn, a fact read afterwards would be dropped by the old arithmetic too,
+%% and the test would pass without the fix.
+a_fact_that_arrived_inside_the_clock_is_dropped_when_it_is_read() ->
+    ok = forget(),
+    application:set_env(mcl_spartan, opening_clock_ms, 500),
+    _ = restarted(),
+    meck:expect(mind_llm, reason,
+                fun(_Charter, _Prompt) ->
+                    timer:sleep(1000),
+                    {ok, #{body => <<"A slow post.">>, tokens => 5}}
+                end),
+    %% ONE turn, from the fact that arrived outside the clock; the fact handed
+    %% over while that turn was running is CLOCKED when the mind finally reads
+    %% it, which is the whole point. (The turn it did take published, hence the
+    %% third counter.)
+    ?assertEqual(#{turns => 1, published => 1, clocked => 1},
+                 counted(fun() -> ok = spartan_mind:think(fact(<<"k1">>)),
+                                 ok = spartan_mind:think(fact(<<"k2">>))
+                         end)),
+    application:set_env(mcl_spartan, opening_clock_ms, 0).
+
 %% @doc ⚠ THE TURN IS OFF THE WIRE SUBSCRIBER. A pool makes a turn as long as
 %% every provider's patience added together, and the subscriber used to make that
 %% turn synchronously and be restarted for it, dropping whatever facts it was
@@ -330,8 +359,13 @@ forget() ->
 %% Asking for the report is also the barrier: the turn is a cast, and a call from
 %% this process lands behind the cast this process just made.
 delta(Item) ->
+    counted(fun() -> ok = spartan_mind:think(Item) end).
+
+%% The same, for a group of facts handed over together, which is what the clock
+%% test needs: the second cast has to land while the first turn is still running.
+counted(Offer) ->
     Before = spartan_mind:report(),
-    ok = spartan_mind:think(Item),
+    ok = Offer(),
     moved(maps:with(?COUNTERS, Before), maps:with(?COUNTERS, spartan_mind:report())).
 
 moved(Before, After) ->

@@ -68,6 +68,22 @@ but a statement about the next few minutes. W3 of the agora walking skeleton
   serialises itself instead, and the facts that queue behind a turn are answered
   by the gates in microseconds.
 
+- **The opening clock gates when a fact ARRIVED, not when it was read.** Taking
+  the turn off the wire made this true the moment it landed: a turn can outlast
+  the clock, so a fact handed over during one was read after the clock had
+  already elapsed, opened a paid turn of its own, and so did the next one, with
+  the mailbox as the only bound on it. The arrival is stamped where the wire
+  hands the fact over, so a fact that was already waiting when the mind got to it
+  opens nothing.
+
+- **A body of valid JSON that is not an object no longer takes the mind down.**
+  jsx decodes an array into a list and `null` into an atom, and reading `usage`
+  out of either raised a badmap inside the mind's own cast: a gateway answering
+  `[]` would have killed the mind and taken everything queued behind it with it.
+  A turn that costs the turn, and that the schedule fails over from, is what it
+  is now, at both levels: a body that is not an object, and a choice whose
+  message is not one.
+
 - **A provider that does not make it into the schedule says so.** A name this
   code does not know, or a keyed provider with no key, is dropped by design; it
   is dropped out loud now, once per schedule, which is the difference between a

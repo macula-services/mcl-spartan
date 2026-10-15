@@ -74,9 +74,18 @@ start_link() ->
 %% and are decided by the gates below, which cost a comparison rather than a
 %% call, so the queue drains as fast as it forms. What the turn did with the fact
 %% is in the mind's own report, which is where the outcome was always readable.
+%%
+%% ⚠ THE ARRIVAL IS STAMPED HERE, NOT WHEN THE FACT IS LOOKED AT, and that is
+%% what keeps the clock a clock. A walk can outlast the opening clock, so a fact
+%% handed over during one is dequeued after the clock has already elapsed: gated
+%% on the time it was READ, every fact that queued behind a slow turn would open
+%% a paid turn of its own, one after another, which is the spend spiral the clock
+%% exists to stop and the mailbox the only bound on it. Gated on the time it
+%% ARRIVED, a fact that arrived before or during that turn is inside the clock
+%% and is dropped, however long the mind took to get to it.
 -spec think(map()) -> ok.
 think(Item) ->
-    gen_server:cast(?MODULE, {think, Item}).
+    gen_server:cast(?MODULE, {think, Item, erlang:monotonic_time(millisecond)}).
 
 %% @doc Whether the mind is well. Being out of budget is not unwell: a resting
 %% mind is green, and its report is where that is visible.
@@ -109,8 +118,8 @@ init([]) ->
 %% @private One fact, one turn, and nobody waiting on the answer: the caller is
 %% the wire subscriber, which has to stay responsive while a turn runs, and the
 %% mind's own counters are where the outcome lands.
-handle_cast({think, Item}, St) ->
-    {_Outcome, St1} = turn(Item, St),
+handle_cast({think, Item, Arrived}, St) ->
+    {_Outcome, St1} = turn(Item, Arrived, St),
     {noreply, St1};
 handle_cast(_Msg, St) -> {noreply, St}.
 
@@ -126,22 +135,22 @@ terminate(_Reason, _St) -> ok.
 %%====================================================================
 
 %% @private The four gates, cheapest first.
-turn(Item, St) ->
+turn(Item, Arrived, St) ->
     case agora_stimulus:of_fact(Item) of
         {error, missing_item_id} ->
             {refused, St#mind{refused = St#mind.refused + 1}};
         {ok, Stimulus} ->
-            offered(agora_stimulus:item_id(Stimulus), Stimulus, St)
+            offered(agora_stimulus:item_id(Stimulus), Stimulus, Arrived, St)
     end.
 
-offered(ItemId, Stimulus, St) ->
+offered(ItemId, Stimulus, Arrived, St) ->
     case maps:is_key(ItemId, St#mind.opened_set) of
         true  -> {duplicate, St#mind{duplicates = St#mind.duplicates + 1}};
-        false -> clocked(ItemId, Stimulus, St)
+        false -> clocked(ItemId, Stimulus, Arrived, St)
     end.
 
-clocked(ItemId, Stimulus, St) ->
-    case inside_clock(St) of
+clocked(ItemId, Stimulus, Arrived, St) ->
+    case inside_clock(Arrived, St) of
         true  -> {clock, St#mind{clocked = St#mind.clocked + 1}};
         false -> budgeted(ItemId, Stimulus, St)
     end.
@@ -238,9 +247,13 @@ spoke_of(ItemId, {error, Reason}, St) ->
 turned(St) ->
     St#mind{last_turn_ms = erlang:monotonic_time(millisecond)}.
 
-inside_clock(#mind{last_turn_ms = undefined}) -> false;
-inside_clock(#mind{last_turn_ms = Last}) ->
-    erlang:monotonic_time(millisecond) - Last < opening_clock_ms().
+%% ⚠ THE QUESTION IS WHEN THE FACT ARRIVED, NOT WHEN IT WAS READ, and the two
+%% differ by however long the last turn took. A fact stamped before the last turn
+%% started gives a NEGATIVE interval, which is inside the clock: a fact that was
+%% already waiting when the mind got to it opens nothing.
+inside_clock(_Arrived, #mind{last_turn_ms = undefined}) -> false;
+inside_clock(Arrived, #mind{last_turn_ms = Last}) ->
+    Arrived - Last < opening_clock_ms().
 
 opening_clock_ms() ->
     application:get_env(mcl_spartan, opening_clock_ms, ?OPENING_CLOCK_DEFAULT_MS).
