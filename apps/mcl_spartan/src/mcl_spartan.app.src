@@ -1,6 +1,6 @@
 {application, mcl_spartan, [
     {description, "The Spartan Mind: hears the real wire, reasons once about one story, and posts what it made of it to the square"},
-    {vsn, "0.1.1"},
+    {vsn, "0.2.0"},
     {registered, [mcl_spartan_sup, spartan_mind]},
     {mod, {mcl_spartan_app, []}},
     {applications, [
