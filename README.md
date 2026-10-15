@@ -97,8 +97,12 @@ them.
 never that every key failed. The cap spends what the turn cost: the tokens from
 whichever slot answered, plus what the slots that failed first had already
 spent, because a reply cut off by the token limit is paid for and a turn that
-gave up after three providers spent at three. `/health` reads the pool: which
-providers, how many keys each, and which are resting. A provider a deployment
+gave up after three providers spent at three. The pool is visible in the mind's
+own report, `spartan_mind:report/0`: each provider, its model, how many keys it
+holds, and which of them are resting. `/health` stays `ok` while the mind is up,
+a resting one included, and carries no more than that: mcl_om builds its
+document from the service's health verdict and has no room for a service's own
+detail, which is what mcl-spartan#4 is about. A provider a deployment
 names that does not make it into the schedule (an unknown name, or no key) is
 logged at build time rather than dropped in silence.
 

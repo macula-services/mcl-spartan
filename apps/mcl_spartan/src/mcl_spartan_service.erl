@@ -34,7 +34,14 @@ stop(_State) -> ok.
 %% have reported anything), and neither is a dark mesh (facts are missed and the
 %% mind keeps what it holds), both deliberately. A mind that has spent its daily
 %% budget and is resting IS healthy: it is a state the design insists on, not a
-%% fault, and it says so on /health through the mind's own report.
+%% fault, and /health stays ok for it.
+%%
+%% ⚠ AND THAT IS ALL /health SAYS. mcl_om builds the document from this verdict
+%% plus its own grant and advertise checks, so a service's own detail (the day's
+%% spend, and the provider pool with its key counts and which are resting) is NOT
+%% in that JSON, however useful it would be there: it is in spartan_mind:report/0.
+%% mcl-spartan#4 is where the mind publishes something a health read can carry,
+%% and until it lands the pool is read from the box, not from the endpoint.
 health() -> spartan_mind:health().
 
 %% A speaker offers no procedure: it publishes a fact, and the keeper subscribes.

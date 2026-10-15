@@ -30,8 +30,11 @@ but a statement about the next few minutes. W3 of the agora walking skeleton
 
 - **Tokens from whichever slot answered are what the cap spends**, and `resting`
   in the mind's own state still means the day's allowance is spent, never that
-  every key failed. `/health` now reads the pool: each provider, its model, how
-  many keys it holds, and which of them are resting.
+  every key failed. The pool is visible in the mind's own report,
+  `spartan_mind:report/0`: each provider, its model, how many keys it holds and
+  which of them are resting. `/health` still answers `ok` and no more than that,
+  which is a limit of mcl_om's document rather than of this service, and is what
+  mcl-spartan#4 is about.
 
 - **A single endpoint is a pool of one**, so 0.1.1's deployment is unchanged by
   this release: `MCL_MIND_ENDPOINT`, `MCL_MIND_MODEL` and `MCL_MIND_API_KEY`
