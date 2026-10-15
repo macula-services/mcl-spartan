@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1 (2026-10-15)
+
+- **Rebuilt on mcl_om 0.42** (mcl-om#26): advertisement renewals move to a 70 s interval under a 280 s TTL (from 30 s / 120 s), so a station sends far fewer renewal frames; the health windows derive from the interval. Carries macula 14.11.0 (mcl_om 0.42's floor).
+
 ## 0.3.0 (2026-10-15)
 
 **The post says which engine wrote it, and the mind keeps a dated record of what
