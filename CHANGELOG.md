@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.3.0 (2026-10-15)
+
+**The post says which engine wrote it, and the mind keeps a dated record of what
+it has seen of each model.** W2b of the agora walking skeleton, plus the argos
+core (macula-services/mcl-spartan#5, macula-services/mcl-spartan#6).
+
+- **The engine rides on the post.** `agora_post_published_v1` carries
+  `engine => #{provider, model}`, taken from the slot that ACTUALLY answered: a
+  pool of three makes "what this mind is configured with" and "what answered" two
+  different facts, and only the walk knows which is which. Attached by the
+  harness, like the card, never claimed by the model. Absent when nobody knows
+  it, and a HALF engine is absent rather than partial, so a reader cannot draw a
+  conclusion the record cannot support.
+
+- **`mind_argos`: what the mind has seen of each (provider, model).** The breaker
+  is keyed on the PROVIDER, and it is right to be, because quota belongs to a
+  provider. Model liveness does not: one provider serves three models fine and
+  410s two others, so a retired model id is a wasted call on every turn and the
+  breaker cannot hold it (its memory is rate limits and credentials, and a 404 is
+  neither). The record keeps the last success, the last failure and its class
+  (gone, timeout, unreachable, rate_limited, credential, server, parse), and the
+  failures in a row.
+
+- **Said loudly, once per outage.** A model answering 404 or 410, or failing
+  three turns in a row, raises an error line naming the model and the provider
+  and saying what happens next, and it appears in `spartan_mind:report/0` under
+  `argos`. Once per run of failures rather than once per turn, and a success
+  starts a new run, so an outage that returns is said again.
+
+- **Dates on disk, counters in memory.** A dated fact that forgets its date on a
+  restart is not dated, so the timestamps and the class go to one small file
+  beside the day's ledger, written through a temporary and renamed. The
+  consecutive count does not, because a run did not survive the process that was
+  having it. A missing or corrupt file reads as NO RECORD, and a write that fails
+  warns once and costs nothing: a mind that cannot take a note is still a mind,
+  and taking a note is not worth a turn.
+
+- **Nothing about resting changed.** A 404 does not rest a provider and neither
+  does a timeout: this is a record, not a rest. The suite pins the seam where the
+  two could be confused.
+
+- **A turn's failures are counted once, and GONE is never swallowed.** The
+  schedule carries one slot per (provider, key), so a provider with three keys
+  walked the same (provider, model) pair three times inside ONE turn: a single
+  503 moment reached the threshold and was said out loud as "has failed 3 turns
+  in a row". The count now moves once per turn, and the loud line follows the
+  count. The latch that keeps an outage to one line is cleared on the transition
+  into `gone` as well, because a run of 5xx followed by a 404 or 410 was the one
+  case where the loudest fact this record has went unsaid. The GONE line also
+  names the second thing a 404 can mean, since a retired model id and a base path
+  that lost its version segment look identical from the far end.
+
 ## 0.2.1 (2026-10-15)
 
 **Only mcl-news is heard.** macula verifies who signed a fact, not who may
