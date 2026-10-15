@@ -51,6 +51,28 @@ a_numeric_setting_is_not_ignored_test() ->
     application:unset_env(mcl_spartan, mind_max_tokens),
     application:unset_env(mcl_spartan, mind_timeout_ms).
 
+%% ⚠ AND THE OTHER HALF OF THAT: sys.config carries the TEXT ones as STRINGS,
+%% which is what the deploy file has. A reader that passed a string through
+%% unchanged was handing jsx an Erlang list, which encodes as an ARRAY OF CODE
+%% POINTS, not as a JSON string. The live mind asked the endpoint for
+%% "model":[111,112,101,...] and the whole request came back refused:
+%% "'model' : doesn't match any schema from 'anyOf'". The first deployment
+%% found it in the mind's own log, on the first item it heard.
+%%
+%% The model the endpoint is asked for, in the shape the deploy file gives it.
+a_text_setting_from_the_deploy_file_is_a_json_string_test() ->
+    _ = with_endpoint(200, answer(<<"A post.">>, 42)),
+    %% with_endpoint already set the endpoint as a string, which is the form
+    %% sys.config carries; the model is the one this test changes the shape of.
+    application:set_env(mcl_spartan, mind_model, "test-model"),
+    {ok, _} = mind_llm:reason(<<"charter">>, <<"prompt">>),
+    Request = last_request(),
+    ?assertMatch({_, _}, binary:match(Request, <<"\"model\":\"test-model\"">>)),
+    ?assertEqual(nomatch, binary:match(Request, <<"\"model\":[">>)),
+    %% One type out of the reader, whichever form the deploy file used.
+    ?assert(is_binary(mind_llm:endpoint())),
+    ?assert(is_binary(mind_llm:model())).
+
 %% A reply the endpoint cut off is NOT a post. What comes back is a paragraph
 %% ending mid-sentence, and an empty one reads here as "nothing to say", so
 %% without this the failure is silent, spends its tokens, and looks like a mind

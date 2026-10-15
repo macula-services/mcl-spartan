@@ -101,12 +101,23 @@ tokens(_Unusable, RequestBytes, Content) ->
 %%
 %% ⚠ TEXT AND NUMBERS ARE READ DIFFERENTLY, AND THAT IS NOT PEDANTRY. sys.config
 %% substitutes these from the environment, so `{mind_max_tokens, 1024}' arrives
-%% as an INTEGER and `{mind_model, <<"...">>}' as a string; a helper that only
+%% as an INTEGER and `{mind_model, "..."}' as a STRING; a helper that only
 %% accepted strings would take the ceiling and the timeout from the file and
 %% quietly ignore both, leaving every deployment on the defaults with nothing
 %% saying so. A number that is not a positive integer is the default.
+%%
+%% ⚠ AND ONE TYPE COMES OUT OF THE TEXT READER, A BINARY, WHICHEVER FORM WENT
+%% IN. A string was passed through unchanged, and a string that reaches
+%% jsx:encode comes out as an ARRAY OF CODE POINTS, not as a JSON string: the
+%% first deployment asked its endpoint for
+%% `"model":[111,112,101,110,97,105,...]' and the endpoint refused the whole
+%% request, "'model' : doesn't match any schema from 'anyOf'". The tests missed
+%% it because they set the model as a BINARY, which is the shape the code
+%% wanted rather than the shape the deploy file gives. `binary_to_list/1' in
+%% authorization/1 wanted a binary too, so a string key was a crash there
+%% rather than a refusal.
 
--spec endpoint() -> string().
+-spec endpoint() -> binary().
 endpoint() -> text(mind_endpoint, ?DEFAULT_ENDPOINT).
 
 -spec model() -> binary().
@@ -140,10 +151,12 @@ key_presence(undefined) -> absent;
 key_presence(<<>>)      -> absent;
 key_presence(_Key)      -> present.
 
+%% @doc One type out, whichever form the deploy file used. The default passes
+%% through untouched: api_key/0's is undefined.
 text(Key, Default) ->
     case application:get_env(mcl_spartan, Key, Default) of
         Value when is_binary(Value), Value =/= <<>> -> Value;
-        Value when is_list(Value), Value =/= ""     -> Value;
+        Value when is_list(Value), Value =/= ""     -> unicode:characters_to_binary(Value);
         _                                           -> Default
     end.
 
