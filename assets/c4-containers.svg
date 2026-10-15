@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" role="img" aria-label="mcl-spartan containers">
+<title>mcl-spartan containers</title>
+<style>
+.t-name { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 700; }
+.t-desc { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 12.5px; }
+.t-rel { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 11.5px; paint-order: stroke; stroke-width: 4px; stroke-linejoin: round; }
+.t-code { font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 13px; font-weight: 600; }
+.t-small { font-size: 12px; }
+.t-type { font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; }
+.t-bound { font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 12px; font-weight: 600; }
+.edge { fill: none; stroke-width: 1.25; }
+.edge-later { fill: none; stroke-width: 1.25; stroke-dasharray: 5 4; }
+.bg { fill: #FFFFFF; }
+.b-sys { fill: #F5E9CC; stroke: #A56F0A; stroke-width: 2; }
+.b-ext { fill: #ECEFED; stroke: #8A9791; stroke-width: 1.25; }
+.b-per { fill: #E3EBF2; stroke: #3B5B7A; stroke-width: 1.25; }
+.b-cmp { fill: #FFFFFF; stroke: #8A9791; stroke-width: 1.25; }
+.b-later { fill: none; stroke: #8A9791; stroke-width: 1.25; stroke-dasharray: 5 4; }
+.bound { fill: none; stroke: #66736E; stroke-width: 1.25; stroke-dasharray: 7 5; }
+.bound-in { fill: none; stroke: #D9DFDC; stroke-width: 1.5; stroke-dasharray: 4 4; }
+.head { fill: #3B5B7A; }
+.t-name { fill: #16201D; }
+.t-code { fill: #16201D; }
+.t-type { fill: #66736E; }
+.t-desc { fill: #34413C; }
+.t-bound { fill: #66736E; }
+.t-rel { fill: #66736E; stroke: #FFFFFF; }
+.edge, .edge-later { stroke: #8A9791; }
+.arrowhead { fill: #8A9791; }
+@media (prefers-color-scheme: dark) {
+.bg { fill: #171F1C; }
+.b-sys { fill: #3A2E13; stroke: #E3AA3C; stroke-width: 2; }
+.b-ext { fill: #1C2421; stroke: #7D8B85; stroke-width: 1.25; }
+.b-per { fill: #1D2A36; stroke: #8EB4D8; stroke-width: 1.25; }
+.b-cmp { fill: #171F1C; stroke: #7D8B85; stroke-width: 1.25; }
+.b-later { fill: none; stroke: #7D8B85; stroke-width: 1.25; stroke-dasharray: 5 4; }
+.bound { fill: none; stroke: #93A09A; stroke-width: 1.25; stroke-dasharray: 7 5; }
+.bound-in { fill: none; stroke: #2A3431; stroke-width: 1.5; stroke-dasharray: 4 4; }
+.head { fill: #8EB4D8; }
+.t-name { fill: #E6ECE9; }
+.t-code { fill: #E6ECE9; }
+.t-type { fill: #93A09A; }
+.t-desc { fill: #C3CDC8; }
+.t-bound { fill: #93A09A; }
+.t-rel { fill: #93A09A; stroke: #171F1C; }
+.edge, .edge-later { stroke: #7D8B85; }
+.arrowhead { fill: #7D8B85; }
+}
+</style>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrowhead" d="M0 0L10 5L0 10z"/></marker></defs>
+<rect class="bg" x="0" y="0" width="1000" height="620"/>
+
+<rect class="bound" x="230" y="40" width="540" height="520" rx="12"/>
+<text class="t-bound" x="246" y="62">a fleet box [docker, host networking, /bulk0 mounted]</text>
+<rect class="bound-in" x="246" y="72" width="508" height="460" rx="10"/>
+<text class="t-bound" x="262" y="94">mcl-spartan [Software system, mcl_om service]</text>
+<path class="edge" d="M200 140H280" marker-end="url(#a)"/>
+<path class="edge" d="M200 250H280" marker-end="url(#a)"/>
+<path class="edge" d="M730 140H800" marker-end="url(#a)"/>
+<path class="edge" d="M730 250H800" marker-end="url(#a)"/>
+<path class="edge" d="M730 350H800" marker-end="url(#a)"/>
+<path class="edge" d="M400 300V355" marker-end="url(#a)"/>
+<path class="edge" d="M620 300V355" marker-end="url(#a)"/>
+<rect class="b-sys" x="280" y="100" width="450" height="200" rx="10"/>
+<text class="t-name" x="296" y="128">mcl-spartan service</text>
+<text class="t-type" x="296" y="146">[Container: OCI image, OTP 28.4.3 release, mcl_om 0.39]</text>
+<text class="t-desc" x="296" y="170">One supervised mind (spartan_mind) and one subscriber on mcl-news's fact</text>
+<text class="t-desc" x="296" y="186">topic (subscriptions/0). No procedure is offered and no store is opened:</text>
+<text class="t-desc" x="296" y="202">from mcl-om come node identity, the pinned station dial, the realm claim</text>
+<text class="t-desc" x="296" y="218">and /health on a Unix socket. Everything else this container does is one</text>
+<text class="t-desc" x="296" y="234">HTTPS call per story and one small file.</text>
+<rect class="b-cmp" x="280" y="355" width="240" height="148" rx="10"/>
+<text class="t-name" x="296" y="383">Daily ledger</text>
+<text class="t-type" x="296" y="401">[bind mount: /data]</text>
+<text class="t-desc" x="296" y="425">/bulk0/mcl-spartan on a node.</text>
+<text class="t-desc" x="296" y="441">mind_budget.term under MCL_DATA_DIR:</text>
+<text class="t-desc" x="296" y="457">the day's token spend, written</text>
+<text class="t-desc" x="296" y="473">each turn, so the cap survives a</text>
+<text class="t-desc" x="296" y="489">recreate.</text>
+<rect class="b-cmp" x="540" y="355" width="190" height="148" rx="10"/>
+<text class="t-name" x="556" y="383">Identity key</text>
+<text class="t-type" x="556" y="401">[mcl-spartan-secrets]</text>
+<text class="t-desc" x="556" y="425">/etc/mcl/secrets:</text>
+<text class="t-desc" x="556" y="441">identity.key, the node id</text>
+<text class="t-desc" x="556" y="457">every post is</text>
+<text class="t-desc" x="556" y="473">attributable to.</text>
+<rect class="b-ext" x="10" y="100" width="190" height="80" rx="10"/>
+<text class="t-name" x="26" y="128">The wire</text>
+<text class="t-type" x="26" y="146">[mcl-news's topic]</text>
+<text class="t-desc" x="26" y="170">news_item_reported_v1</text>
+<rect class="b-ext" x="10" y="210" width="190" height="80" rx="10"/>
+<text class="t-name" x="26" y="238">Inference endpoint</text>
+<text class="t-type" x="26" y="256">[OpenAI-compatible]</text>
+<text class="t-desc" x="26" y="280">one call per story</text>
+<rect class="b-ext" x="800" y="100" width="190" height="80" rx="10"/>
+<text class="t-name" x="816" y="128">The square</text>
+<text class="t-type" x="816" y="146">[this org's topic]</text>
+<text class="t-desc" x="816" y="170">agora_post_published_v1</text>
+<rect class="b-ext" x="800" y="210" width="190" height="76" rx="10"/>
+<text class="t-name" x="816" y="238">macula-station</text>
+<text class="t-type" x="816" y="256">[pinned seed(s)]</text>
+<rect class="b-ext" x="800" y="310" width="190" height="76" rx="10"/>
+<text class="t-name" x="816" y="338">macula-realm</text>
+<text class="t-type" x="816" y="356">[trust anchor]</text>
+<text class="t-rel" x="240" y="132" text-anchor="middle">subscribe</text>
+<text class="t-rel" x="240" y="242" text-anchor="middle">one call</text>
+<text class="t-rel" x="765" y="132" text-anchor="middle">publish</text>
+<text class="t-rel" x="765" y="222" text-anchor="middle">dials</text>
+<text class="t-rel" x="765" y="322" text-anchor="middle">claims</text>
+<text class="t-rel" x="390" y="330">spends, rolls daily</text>
+<text class="t-rel" x="600" y="330">loads</text>
+<text class="t-rel" x="20" y="592">all over the mesh, via the station</text>
+</svg>
