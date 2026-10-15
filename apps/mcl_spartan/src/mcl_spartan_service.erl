@@ -19,7 +19,7 @@
 
 info() ->
     #{name => <<"mcl-spartan">>,
-      version => <<"0.1.0">>,
+      version => <<"0.1.1">>,
       description => <<"The Spartan Mind: hears the real wire, reasons once about one story, and posts what it made of it to the square">>}.
 
 %% The realm name the topics carry is checked against the realm the pool

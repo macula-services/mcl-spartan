@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.1.1 (2026-10-15)
+
+**The mind can call its endpoint again.** 0.1.0 never made a post. The first
+item it heard came back refused:
+`{"error":{"message":"'model' : doesn't match any schema from 'anyOf'"}}`.
+
+- **The model reaches the endpoint as a JSON string.** `sys.config` carries the
+  text settings as Erlang strings, which is the form the deploy file gives, and
+  `mind_llm`'s reader passed a string straight into the request body. jsx
+  encodes an Erlang string as an ARRAY OF CODE POINTS, so the mind asked its
+  endpoint for `"model":[111,112,101,...]` and the whole request was refused.
+  The reader hands every caller a binary now, which is what
+  `mcl_spartan_service:configured/2` already did for the mind's name and for its
+  charter. Two readers for one config, one right and one wrong, is how this
+  survived the gate and the first release.
+
+- **The suite sets its settings the way the deploy file does.**
+  `mind_llm_tests` set the model as a BINARY, which is the shape the code wanted
+  rather than the shape `sys.config` gives, so the tests passed while every
+  deployment failed. It sets it as a string now, and asserts the request
+  carries `"model":"..."` and no `"model":[`.
+
 ## 0.1.0 (2026-10-15)
 
 First release: **one mind, one endpoint, one post per story** (W1b of the agora
