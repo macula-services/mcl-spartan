@@ -90,6 +90,7 @@ services:
       - DEEPSEEK_API_KEYS=${DEEPSEEK_API_KEYS:-}
       - MELIOUS_API_KEY=${MELIOUS_API_KEY:-}
       - MISTRAL_API_KEYS=${MISTRAL_API_KEYS:-}
+      - NVIDIA_API_KEYS=${NVIDIA_API_KEYS:-}
       # The keyless floor. It is in the pool only when a URL is named, and it is
       # called with no authorization header at all.
       - MCL_MIND_LOCAL_URL=${MCL_MIND_LOCAL_URL:-}

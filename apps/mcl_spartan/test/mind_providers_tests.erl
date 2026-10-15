@@ -66,6 +66,13 @@ the_pooled_providers_are_the_ones_worth_calling_test() ->
     ?assertEqual(<<"deepseek-chat">>, maps:get(model, Deepseek)),
     ?assertEqual("MELIOUS_API_KEY", maps:get(keyenv, mind_llm:provider_config("melious"))),
     ?assertEqual("MISTRAL_API_KEYS", maps:get(keyenv, mind_llm:provider_config("mistral"))),
+    Nvidia = mind_llm:provider_config("nvidia"),
+    ?assertEqual("https://integrate.api.nvidia.com/v1/chat/completions", maps:get(url, Nvidia)),
+    ?assertEqual("NVIDIA_API_KEYS", maps:get(keyenv, Nvidia)),
+    ?assertEqual(<<"nvidia/nemotron-3-super-120b-a12b">>, maps:get(model, Nvidia)),
+    %% cerebras is still out: its ported model name answers 404, and a constant
+    %% naming a model the provider no longer serves is a backend that fails
+    %% every turn and is skipped in silence.
     ?assertEqual(undefined, mind_llm:provider_config("cerebras")).
 
 %% A model that moves with the provider's catalog is env-driven, so it can be
@@ -74,6 +81,16 @@ a_model_can_be_moved_without_a_rebuild_test() ->
     with_env("MCL_DEEPSEEK_MODEL", "deepseek-reasoner", fun() ->
         ?assertEqual(<<"deepseek-reasoner">>,
                      maps:get(model, mind_llm:provider_config("deepseek")))
+    end).
+
+%% A catalog that moves needs a model that can move with it, and it arrives as
+%% text from the command line: the reader hands jsx a binary or the request
+%% carries a code-point array.
+a_nvidia_model_is_env_driven_and_a_json_string_test() ->
+    with_env("MCL_NVIDIA_MODEL", "nvidia/nemotron-3-ultra-550b-a55b", fun() ->
+        Model = maps:get(model, mind_llm:provider_config("nvidia")),
+        ?assertEqual(<<"nvidia/nemotron-3-ultra-550b-a55b">>, Model),
+        ?assert(is_binary(Model))
     end).
 
 %% `reasoning_effort` is not part of the compatible subset every provider

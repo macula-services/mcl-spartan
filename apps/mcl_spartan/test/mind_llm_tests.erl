@@ -147,6 +147,19 @@ a_rate_limited_provider_falls_to_the_next_slot_test() ->
     ?assertEqual(["endpoint", "local"], providers()),
     ?assertEqual(["endpoint"], resting_providers()).
 
+%% @doc A 503 is the most likely thing a busy free provider says, and it is the
+%% MOMENT rather than the backend, so it is not remembered: the turn rotates
+%% past it and the next turn asks it again, which is what "intermittently busy"
+%% deserves. 429 and 401/403 ARE remembered; mind_breaker_tests pins that half.
+a_busy_provider_is_rotated_past_and_not_rested_test() ->
+    clear_breaker(),
+    _ = with_pool(503, <<"{\"error\":\"upstream busy\"}">>,
+                  200, answer(<<"A post from the next slot.">>, 77)),
+    {ok, Reply} = mind_llm:reason(<<"charter">>, <<"prompt">>),
+    ?assertEqual(<<"A post from the next slot.">>, maps:get(body, Reply)),
+    ?assertEqual(77, maps:get(tokens, Reply)),
+    ?assertEqual([], resting_providers()).
+
 %% @doc The deliberate deviation from the reference: a turn that dies on its
 %% LAST slot is still a failure of that backend, so the breaker rests it. With
 %% one provider configured, which is what is live today, the reference left the

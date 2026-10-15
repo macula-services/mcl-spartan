@@ -138,7 +138,8 @@ is bounded by the clock anyway.
 | `MCL_MIND_ENDPOINT` | a free OpenAI-compatible endpoint | where the single named endpoint lives, which is the pool of one |
 | `MCL_MIND_MODEL` | `openai/gpt-oss-20b` | which model the single endpoint is asked for |
 | `MCL_MIND_API_KEY` | none | the single endpoint's key, from the box's secret store. Optional: no key means no authorization header |
-| `GROQ_API_KEYS`, `DEEPSEEK_API_KEYS`, `MELIOUS_API_KEY`, `MISTRAL_API_KEYS` | none | the key POOL of each provider, comma-separated, from the box's secret store |
+| `GROQ_API_KEYS`, `DEEPSEEK_API_KEYS`, `MELIOUS_API_KEY`, `MISTRAL_API_KEYS`, `NVIDIA_API_KEYS` | none | the key POOL of each provider, comma-separated, from the box's secret store |
+| `MCL_DEEPSEEK_MODEL`, `MCL_MELIOUS_MODEL`, `MCL_MISTRAL_MODEL`, `MCL_NVIDIA_MODEL` | a model that answers for each | which model a provider is asked for, for the catalogs that move |
 | `MCL_MIND_LOCAL_URL`, `MCL_MIND_LOCAL_MODEL`, `MCL_MIND_LOCAL_API_KEY` | none | the keyless local floor for `MCL_MIND_FALLBACK_PROVIDERS`. It is in the pool only when a URL is named |
 | `MCL_MIND_MAX_TOKENS` | `1024` | one turn's ceiling, in tokens out, for every provider that does not declare its own |
 | `MCL_MIND_TIMEOUT_MS` | `30000` | how long to wait for a provider that does not declare its own |
@@ -146,10 +147,13 @@ is bounded by the clock anyway.
 | `MCL_DAILY_TOKEN_CAP` | `100000` | the day's allowance, across restarts |
 | `MCL_DATA_DIR` | `/data` | where the ledger lives |
 
-A provider is added to the code by a clause in `mind_llm:provider_config/1` plus
-its name in `MCL_MIND_PROVIDERS`, on the day a real call answers: a constant
-naming a model the provider has since retired is a backend that fails every turn
-and is skipped by the schedule in silence.
+The code knows `groq`, `deepseek`, `melious`, `mistral`, `nvidia` and the local
+floor `local`; which of them a mind uses, and in what ORDER, is entirely
+`MCL_MIND_PROVIDERS`, so putting one provider first is a deployment change and
+not a release. A provider is ADDED by a clause in `mind_llm:provider_config/1`
+plus its name in the CSV, on the day a real call answers: a constant naming a
+model the provider has since retired is a backend that fails every turn and is
+skipped by the schedule in silence.
 
 ## The C4 model
 

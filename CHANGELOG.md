@@ -38,6 +38,14 @@ but a statement about the next few minutes. W3 of the agora walking skeleton
   become the provider named `endpoint`, and its key stays optional, which is what
   a local serve or a proxy needs.
 
+- **NVIDIA joins the pool**, on the day a real call answered rather than from a
+  catalog listing: `NVIDIA_API_KEYS` and `MCL_NVIDIA_MODEL`, because that catalog
+  MOVES (the previous default reached end-of-life days after it was verified, and
+  every attempt then failed straight to the next slot with nothing saying so).
+  The model that answers 503 when it is busy is a rotation and not a rest: a 5xx
+  is the moment rather than the backend, so the turn walks past it and the next
+  turn asks it again, which is what "intermittently busy" deserves.
+
 - **`reasoning_effort` is declared per provider.** It is not part of the
   compatible subset every provider accepts, and a provider that rejects an
   unknown field answers 400, which the schedule reads as the moment and fails

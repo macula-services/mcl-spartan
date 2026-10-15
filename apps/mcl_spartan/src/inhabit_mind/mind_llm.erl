@@ -94,6 +94,19 @@
 -define(MELIOUS_MODEL, <<"qwen3.5-9b">>).
 -define(MISTRAL_URL, "https://api.mistral.ai/v1/chat/completions").
 -define(MISTRAL_MODEL, <<"mistral-small-latest">>).
+%% NVIDIA's free NIM catalog, whose MODEL MOVES and is therefore a deployment
+%% setting rather than a constant. The previous default reached end-of-life days
+%% after it was verified, and every attempt then failed straight to the next
+%% carousel slot without anything saying so; the catalog is also wider than the
+%% account can use (models list in /v1/models and answer 404 on a real call), so
+%% a model is chosen the day a real call answers, not from a listing.
+%%
+%% The default is the one the Supervisor verified live and did NOT flag: the
+%% 550b "ultra" answers too and returns 503 when it is busy, which is a wasted
+%% slot on every busy turn rather than a wrong answer, so it is the second
+%% choice rather than the default.
+-define(NVIDIA_URL, "https://integrate.api.nvidia.com/v1/chat/completions").
+-define(NVIDIA_MODEL, <<"nvidia/nemotron-3-super-120b-a12b">>).
 
 %% The keyless floor: a local OpenAI-compatible serve on the box, at
 %% seconds-per-token. It gets its own patience and its own short output cap so a
@@ -224,6 +237,9 @@ provider_config("melious") ->
 provider_config("mistral") ->
     #{url => ?MISTRAL_URL, model => env_text("MCL_MISTRAL_MODEL", ?MISTRAL_MODEL),
       keyenv => "MISTRAL_API_KEYS", label => "mistral"};
+provider_config("nvidia") ->
+    #{url => ?NVIDIA_URL, model => env_text("MCL_NVIDIA_MODEL", ?NVIDIA_MODEL),
+      keyenv => "NVIDIA_API_KEYS", label => "nvidia"};
 %% The one endpoint a deployment named, which is what a mind with no pool has.
 %% Its key is OPTIONAL: a local serve or a proxy takes no bearer, and the
 %% single-endpoint deployment called out with no authorization header whenever
