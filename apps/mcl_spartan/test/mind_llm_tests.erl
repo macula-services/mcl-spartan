@@ -211,7 +211,21 @@ a_rate_limited_provider_falls_to_the_next_slot_test() ->
     ?assertEqual(<<"A post from the floor.">>, maps:get(body, Reply)),
     ?assertEqual(321, maps:get(tokens, Reply)),
     ?assertEqual(["endpoint", "local"], providers()),
-    ?assertEqual(["endpoint"], resting_providers()).
+    ?assertEqual(["endpoint"], resting_providers()),
+    %% ⚠ THE ENGINE IS THE SLOT THAT ANSWERED, NOT THE HEAD OF THE SCHEDULE. The
+    %% first provider was rate-limited and the second answered, so a post that
+    %% named `endpoint' would be a lie that looks exactly like the truth.
+    ?assertEqual(#{provider => <<"local">>, model => <<"local-model">>},
+                 maps:get(engine, Reply)).
+
+%% And when the first slot answers, the engine says so: the field follows the
+%% answer, not the configuration.
+the_engine_names_the_first_slot_when_the_first_slot_answers_test() ->
+    clear_breaker(),
+    _ = with_endpoint(200, answer(<<"A post.">>, 42)),
+    {ok, Reply} = mind_llm:reason(<<"charter">>, <<"prompt">>),
+    ?assertEqual(#{provider => <<"endpoint">>, model => <<"test-model">>},
+                 maps:get(engine, Reply)).
 
 %% @doc A 503 is the most likely thing a busy free provider says, and it is the
 %% MOMENT rather than the backend, so it is not remembered: the turn rotates

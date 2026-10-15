@@ -11,21 +11,27 @@
 %%% and no post id is spent.
 -module(maybe_publish_to_agora).
 
--export([maybe_publish/3]).
+-export([maybe_publish/4]).
 
 -define(SQUARE, mcl_spartan_topics).
 
 %% @doc Publish one opening, or explain why there is nothing to publish.
--spec maybe_publish(binary(), binary(), map() | undefined) ->
+%%
+%% `Engine' is the provider and model that actually answered, as mind_llm
+%% reported them, and it rides out with the post. It is optional because a post
+%% whose engine nobody recorded is still a post; absent reads as "not known",
+%% which is honest, while a guessed engine would read as a fact.
+-spec maybe_publish(binary(), binary(), map() | undefined, map() | undefined) ->
     {published, binary()} | {silent, empty_body} | {error, term()}.
-maybe_publish(Mind, Body, Stimulus) ->
-    published(Mind, text(Body), Stimulus).
+maybe_publish(Mind, Body, Stimulus, Engine) ->
+    published(Mind, text(Body), Stimulus, Engine).
 
-published(_Mind, <<>>, _Stimulus) -> {silent, empty_body};
-published(Mind, Body, Stimulus) ->
+published(_Mind, <<>>, _Stimulus, _Engine) -> {silent, empty_body};
+published(Mind, Body, Stimulus, Engine) ->
     PostId = post_id(Mind, Body, Stimulus),
     sent(mcl_om_pubsub:publish(square_topic(), agora_post_published_v1:to_map(
-                                      agora_post_published_v1:opening(PostId, Mind, Body, Stimulus)),
+                                      agora_post_published_v1:opening(PostId, Mind, Body, Stimulus,
+                                                                      Engine)),
                                #{mode => sync}),
          PostId).
 

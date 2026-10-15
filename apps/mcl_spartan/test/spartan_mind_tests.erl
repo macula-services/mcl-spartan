@@ -34,6 +34,7 @@ mind_test_() ->
      fun(_Context) ->
          [fun refused_without_an_id/0,
           fun one_post_for_one_item/0,
+          fun a_reply_with_no_engine_publishes_a_post_with_no_engine/0,
           fun a_second_delivery_is_a_duplicate/0,
           fun the_clock_holds_the_next_story/0,
           fun a_failed_turn_still_takes_the_item/0,
@@ -81,7 +82,23 @@ one_post_for_one_item() ->
     ?assertEqual({text, <<"france24">>}, maps:get(source, Stimulus)),
     ?assertEqual([{text, <<"sport">>}], maps:get(topics, Stimulus)),
     %% Absent fields stay absent rather than arriving blank.
-    ?assertNot(maps:is_key(image_url, Stimulus)).
+    ?assertNot(maps:is_key(image_url, Stimulus)),
+    %% WHO WROTE IT rides on the post, from the answer rather than from config:
+    %% a pool of three makes "configured" and "answered" two different facts,
+    %% and the second is the one a reader of the square is owed.
+    ?assertEqual(#{provider => {text, <<"nvidia">>}, model => {text, <<"a-model">>}},
+                 maps:get(engine, Payload)).
+
+%% A reply that names no engine publishes a post with NO engine field, rather
+%% than a half one or a guess. The field is the harness's claim about what
+%% answered, so where nobody knows, it is absent and says so.
+a_reply_with_no_engine_publishes_a_post_with_no_engine() ->
+    ok = forget(),
+    meck:expect(mind_llm, reason,
+                fun(_Charter, _Prompt) -> {ok, #{body => <<"A post.">>, tokens => 7}} end),
+    ?assertEqual(#{turns => 1, published => 1}, delta(fact(<<"l1">>))),
+    {_Topic, Payload} = next_published(),
+    ?assertNot(maps:is_key(engine, Payload)).
 
 a_second_delivery_is_a_duplicate() ->
     ok = forget(),
@@ -331,8 +348,15 @@ fact(ItemId) ->
 %% test can bind it and the call still reads like a line of setup.
 answering(Body, Tokens) ->
     meck:expect(mind_llm, reason,
-                fun(_Charter, _Prompt) -> {ok, #{body => Body, tokens => Tokens}} end),
+                fun(_Charter, _Prompt) ->
+                    {ok, #{body => Body, tokens => Tokens, engine => engine()}}
+                end),
     ok.
+
+%% What mind_llm reports for the slot that answered: this is the shape the real
+%% module produces, not a convenience, because the mind threads it onto the post.
+engine() ->
+    #{provider => <<"nvidia">>, model => <<"a-model">>}.
 
 posted(Topic, Payload) ->
     ets:insert(?POSTS, {posts, posts() ++ [{Topic, Payload}]}),

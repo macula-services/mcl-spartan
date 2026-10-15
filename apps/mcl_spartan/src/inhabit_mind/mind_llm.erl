@@ -139,6 +139,10 @@
 %%
 %% `tokens' in the answer is what the WHOLE TURN cost, so a turn that truncated
 %% at one provider and was answered by the next is charged for both.
+%%
+%% `engine' in the answer is the provider and the model that ANSWERED, not the
+%% first one configured: a pool of three makes those different facts, and only
+%% this module can tell a caller which it was.
 -spec reason(binary(), binary()) -> {ok, map()} | {error, term(), non_neg_integer()}.
 reason(Charter, Prompt) ->
     reason_with([#{<<"role">> => <<"system">>, <<"content">> => Charter},
@@ -356,7 +360,7 @@ walk(Messages, [{Config, Key}], _N) ->
         {ok, _Reply} = Answered ->
             answered(Config, Answered);
         {error, Why, Tokens} ->
-            _ = mind_breaker:failed(Config, Why),
+            ok = failed(Config, Why),
             logger:notice("[mind_llm] ~s failed on the last slot (~p); "
                           "schedule exhausted, this turn is lost", [label(Config), Why]),
             {error, {all_backends_exhausted, label(Config), Why}, Tokens}
@@ -366,7 +370,7 @@ walk(Messages, [{Config, Key} | Rest], N) ->
         {ok, _Reply} = Answered ->
             answered(Config, Answered);
         {error, Why, Tokens} ->
-            _ = mind_breaker:failed(Config, Why),
+            ok = failed(Config, Why),
             Delay = pause_before(Rest, Config, N),
             logger:info("[mind_llm] ~s failed (~p); next slot in ~bms",
                         [label(Config), Why, Delay]),
@@ -374,9 +378,36 @@ walk(Messages, [{Config, Key} | Rest], N) ->
             charged(walk(Messages, Rest, N + 1), Tokens)
     end.
 
-answered(Config, {ok, _Reply} = Answered) ->
+%% The engine travels out with the answer, because THIS is the only place that
+%% knows which slot answered: the schedule is a list and the caller sees one
+%% reply. The post carries it so a reader can check the claim, and it is filled
+%% in here rather than at the call site precisely so it cannot be filled in from
+%% the head of the schedule, which would be a lie that looks exactly like the
+%% truth.
+answered(Config, {ok, Reply}) ->
     _ = mind_breaker:worked(Config),
-    Answered.
+    _ = mind_argos:succeeded(provider(Config), model_of(Config)),
+    {ok, Reply#{engine => engine_of(Config)}}.
+
+%% Every slot attempt is written down TWICE, in the two places that keep
+%% different memories of it: the breaker, which is keyed on the provider because
+%% quota is, and the argos record, which is keyed on the model because liveness
+%% is. Both are told from here, where the attempt actually happened, so neither
+%% can be told about a slot that was never tried.
+failed(Config, Why) ->
+    _ = mind_breaker:failed(Config, Why),
+    _ = mind_argos:failed(provider(Config), model_of(Config), Why),
+    ok.
+
+%% The provider by its configured name and the model it was asked for, both as
+%% text for the wire. A provider that answered with a model nobody configured is
+%% not a case that can happen here: the model is part of the request.
+engine_of(Config) ->
+    #{provider => provider(Config), model => model_of(Config)}.
+
+provider(Config) -> unicode:characters_to_binary(label(Config)).
+
+model_of(Config) -> maps:get(model, Config, <<>>).
 
 %% What a slot that failed still cost, added to whatever the turn ends up
 %% costing: the address of a truncated reply at one provider is part of the

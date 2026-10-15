@@ -17,7 +17,8 @@
 %%% because it cannot read its own ledger, which is worse in every direction.
 -module(mind_budget).
 
--export([load/0, today/1, spend/2, resting/1, report/1, save/1, day/0, cap/0, path/0]).
+-export([load/0, today/1, spend/2, resting/1, report/1, save/1, day/0, cap/0, path/0,
+         data_dir/0]).
 
 -define(LEDGER, "mind_budget.term").
 -define(DEFAULT_CAP, 100000).
@@ -109,6 +110,11 @@ configured_cap(_Unset)                             -> ?DEFAULT_CAP.
 path() ->
     filename:join(data_dir(), ?LEDGER).
 
+%% @doc Where this service keeps the little it keeps. Exported because the argos
+%% record lives beside the ledger and must not read MCL_DATA_DIR for itself: two
+%% readers for one setting is how a directory ends up meaning two things (the
+%% shape of defect mcl-spartan#2 is about, one module over).
+-spec data_dir() -> file:filename_all().
 data_dir() ->
     Dir = application:get_env(mcl_spartan, data_dir, "/data"),
     case is_list(Dir) andalso Dir =/= "" of

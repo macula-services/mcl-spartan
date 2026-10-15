@@ -196,8 +196,8 @@ rested(St) ->
 reasoned(ItemId, Stimulus, St) ->
     St1 = turned(St),
     case mind_llm:reason(St1#mind.charter, prompt(Stimulus)) of
-        {ok, #{body := Body, tokens := Tokens}} ->
-            spoke(ItemId, Body, Tokens, Stimulus, St1);
+        {ok, Reply} ->
+            spoke(ItemId, Reply, Stimulus, St1);
         {error, Reason, Tokens} ->
             failed(ItemId, Reason, Tokens, St1)
     end.
@@ -213,9 +213,16 @@ failed(ItemId, Reason, Tokens, St) ->
     logger:warning("[spartan] turn failed for item ~s: ~p", [ItemId, Reason]),
     {{failed, Reason}, St1#mind{failed = St1#mind.failed + 1}}.
 
-spoke(ItemId, Body, Tokens, Stimulus, St) ->
-    St1 = charged(Tokens, St#mind{turns = St#mind.turns + 1}),
-    spoke_of(ItemId, maybe_publish_to_agora:maybe_publish(St1#mind.name, Body, Stimulus), St1).
+%% What the mind said, what it cost, and WHICH ENGINE said it. The engine comes
+%% from the answer rather than from config, because a pool makes "what this mind
+%% is configured to think with" and "what actually answered" two different
+%% facts, and the second is the one a reader of the post is owed.
+spoke(ItemId, Reply, Stimulus, St) ->
+    St1 = charged(maps:get(tokens, Reply), St#mind{turns = St#mind.turns + 1}),
+    spoke_of(ItemId, maybe_publish_to_agora:maybe_publish(
+                       St1#mind.name, maps:get(body, Reply), Stimulus,
+                       maps:get(engine, Reply, undefined)),
+             St1).
 
 %% What a turn cost, written after every turn that spent anything, so a restart
 %% costs at most one turn rather than the whole day.
@@ -289,7 +296,12 @@ report_of(#mind{} = St) ->
       failed => St#mind.failed,
       opened => map_size(St#mind.opened_set),
       budget => mind_budget:report(St#mind.budget),
-      llm => mind_llm:config()}.
+      llm => mind_llm:config(),
+      %% What the mind has SEEN of each model it calls: when it last answered,
+      %% when it last failed and how, and how many in a row. It is here rather
+      %% than only in the log because a record nobody can read at a glance is a
+      %% record only the log's reader ever sees.
+      argos => mind_argos:report()}.
 
 %% The prompt is what the wire handed over, as prose: the sensor's own `body'
 %% line, which already carries the headline, the class, the source and the
