@@ -53,6 +53,14 @@
 %%% answered. An endpoint that reports no usage would make the cap
 %%% unenforceable, so that case falls back to a character estimate rather than
 %%% to zero.
+%%%
+%%% ⚠ AND THE SLOTS THAT FAILED ARE COUNTED TOO. A 200 whose reply this code
+%%% cannot use (a paragraph cut off by the token limit, a body that is not JSON,
+%%% a reply with no choice in it) has already cost what the endpoint reports, and
+%%% a walk that gave up after three slots spent at three: a turn that failed
+%%% answers `{error, Reason, Tokens}' and the caller charges it. Only a REFUSED
+%%% request is free, because a 429, a 500 or an unreachable host is one the
+%%% provider did not answer at all.
 -module(mind_llm).
 
 -export([reason/2, config/0]).
@@ -118,15 +126,27 @@
 -define(JITTER_MS, 500).
 
 %% @doc One reasoning turn, against the pool: the charter as the system message,
-%% the item as the user message, and the first answer back with what it cost.
--spec reason(binary(), binary()) -> {ok, map()} | {error, term()}.
+%% the item as the user message, and the first answer back with what the turn
+%% cost.
+%%
+%% ⚠ A TURN THAT FAILS IS NOT A FREE TURN, SO THE FAILURE CARRIES ITS COST. An
+%% endpoint that answers 200 with something this code cannot use (a paragraph cut
+%% off by the token limit, a body that is not JSON, a reply with no choice in it)
+%% has already spent what it reports, and a walk that gave up after three slots
+%% spent at all three. The caller charges that to the daily cap. A cap that
+%% counted only the turns that worked would be a cap a failing pool spends
+%% straight through, which is the opposite of what a cap is for.
+%%
+%% `tokens' in the answer is what the WHOLE TURN cost, so a turn that truncated
+%% at one provider and was answered by the next is charged for both.
+-spec reason(binary(), binary()) -> {ok, map()} | {error, term(), non_neg_integer()}.
 reason(Charter, Prompt) ->
     reason_with([#{<<"role">> => <<"system">>, <<"content">> => Charter},
                  #{<<"role">> => <<"user">>, <<"content">> => Prompt}]).
 
 reason_with(Messages) ->
     case schedule() of
-        []    -> {error, no_backend};
+        []    -> {error, no_backend, 0};
         Slots -> walk(Messages, Slots, 1)
     end.
 
@@ -150,9 +170,16 @@ pool_report({Config, Keys}) ->
 %%====================================================================
 
 %% @doc The slots a call would walk, in order, before the breaker has its say.
+%%
+%% It also says which names it had to leave out, once per schedule. A name that
+%% is dropped in SILENCE is how a deployment ends up with one provider when it
+%% asked for three, which is the failure this release exists to fix.
 -spec plan() -> [mind_breaker:slot()].
 plan() ->
-    every_backend_once(pools()) ++ fallback_slots().
+    {Pooled, Missing} = pools_of(providers()),
+    {Fallback, FallbackMissing} = pools_of(fallback_providers()),
+    ok = noted(Missing ++ FallbackMissing),
+    every_backend_once(Pooled) ++ fallback_slots(Pooled, Fallback).
 
 %% @doc The same schedule minus backends that are resting. FAILS OPEN: if that
 %% would leave nothing, the whole plan is walked anyway.
@@ -160,8 +187,40 @@ plan() ->
 schedule() ->
     mind_breaker:usable(plan()).
 
+%% The pool on its own, without the log line: this is what the report a health
+%% check reads is built from, and a health check must not write a line per read.
 pools() ->
-    lists:filtermap(fun pool/1, providers()).
+    element(1, pools_of(providers())).
+
+%% The pool, and the names that did NOT make it: a name this code does not know,
+%% or a keyed provider with no key. Both are dropped by design (a slot that
+%% cannot authenticate spends a call to learn what the log already knows), and
+%% both are worth saying out loud.
+pools_of(Names) ->
+    lists:foldr(fun pooled/2, {[], []}, Names).
+
+pooled(Name, {Pooled, Missing}) ->
+    case provider_config(Name) of
+        undefined -> {Pooled, [{Name, unknown} | Missing]};
+        Config    -> keyed(Name, Config, Pooled, Missing)
+    end.
+
+keyed(Name, Config, Pooled, Missing) ->
+    case provider_keys(Config) of
+        []   -> {Pooled, [{Name, maps:get(keyenv, Config)} | Missing]};
+        Keys -> {[{Config, shuffle(Keys)} | Pooled], Missing}
+    end.
+
+noted(Missing) ->
+    [warn(Dropped) || Dropped <- lists:usort(Missing)],
+    ok.
+
+warn({Name, unknown}) ->
+    logger:warning("[mind_llm] ~s is named in a pool and this code does not know it; "
+                   "it is not in the schedule", [Name]);
+warn({Name, NoKeyEnv}) ->
+    logger:warning("[mind_llm] ~s is named in a pool with no key in ~s; "
+                   "it is not in the schedule", [Name, NoKeyEnv]).
 
 %% One slot per (provider, key), providers interleaved so a turn tries a
 %% different provider before a second key of the one that just failed.
@@ -176,13 +235,10 @@ interleave(Lists) ->
 
 %% One slot per configured fallback, in listed order, and only for a provider
 %% that is not already in the pool.
-fallback_slots() ->
-    [{Config, hd(Keys)} || {Config, Keys} <- fallback_pools()].
-
-fallback_pools() ->
-    Pooled = [label(Config) || {Config, _Keys} <- pools()],
-    [Pool || {Config, _Keys} = Pool <- lists:filtermap(fun pool/1, fallback_providers()),
-             not lists:member(label(Config), Pooled)].
+fallback_slots(Pooled, Fallback) ->
+    PooledLabels = [label(Config) || {Config, _Keys} <- Pooled],
+    [{Config, hd(Keys)}
+     || {Config, Keys} <- Fallback, not lists:member(label(Config), PooledLabels)].
 
 %%====================================================================
 %% The providers
@@ -263,15 +319,10 @@ local_config(Url) when is_list(Url), Url =/= "" ->
 local_config(_Unset) ->
     undefined.
 
-%% A provider with a key pool, or nothing. A keyed provider with no key is not
-%% pooled at all: a slot that cannot authenticate is a slot that spends a call
-%% to learn what the log already knows.
-pool(Name) ->
-    case provider_config(Name) of
-        undefined -> false;
-        Config    -> pool_keys(Config, provider_keys(Config))
-    end.
-
+%% The keys a provider would be called with. A provider whose key is OPTIONAL
+%% (the one endpoint a deployment named, and the keyless local floor) answers a
+%% single slot with no key at all rather than none: the call is the point, and a
+%% local serve ignores a bearer anyway.
 provider_keys(#{key_optional := true} = Config) ->
     case keys(Config) of
         []   -> [undefined];
@@ -279,9 +330,6 @@ provider_keys(#{key_optional := true} = Config) ->
     end;
 provider_keys(Config) ->
     keys(Config).
-
-pool_keys(_Config, [])   -> false;
-pool_keys(Config, Keys)  -> {true, {Config, shuffle(Keys)}}.
 
 %% A pool is a CSV: one key is a pool of one. Whitespace is trimmed and empty
 %% parts are dropped, so " k1 , , k2 " is two keys and not four.
@@ -307,28 +355,36 @@ walk(Messages, [{Config, Key}], _N) ->
     case once(Config, body(Config, Messages), Key) of
         {ok, _Reply} = Answered ->
             answered(Config, Answered);
-        {error, Why} ->
+        {error, Why, Tokens} ->
             _ = mind_breaker:failed(Config, Why),
             logger:notice("[mind_llm] ~s failed on the last slot (~p); "
                           "schedule exhausted, this turn is lost", [label(Config), Why]),
-            {error, {all_backends_exhausted, label(Config), Why}}
+            {error, {all_backends_exhausted, label(Config), Why}, Tokens}
     end;
 walk(Messages, [{Config, Key} | Rest], N) ->
     case once(Config, body(Config, Messages), Key) of
         {ok, _Reply} = Answered ->
             answered(Config, Answered);
-        {error, Why} ->
+        {error, Why, Tokens} ->
             _ = mind_breaker:failed(Config, Why),
             Delay = pause_before(Rest, Config, N),
             logger:info("[mind_llm] ~s failed (~p); next slot in ~bms",
                         [label(Config), Why, Delay]),
             sleep(Delay),
-            walk(Messages, Rest, N + 1)
+            charged(walk(Messages, Rest, N + 1), Tokens)
     end.
 
 answered(Config, {ok, _Reply} = Answered) ->
     _ = mind_breaker:worked(Config),
     Answered.
+
+%% What a slot that failed still cost, added to whatever the turn ends up
+%% costing: the address of a truncated reply at one provider is part of the
+%% price of the turn another provider answered.
+charged({ok, #{tokens := Tokens} = Reply}, Before) ->
+    {ok, Reply#{tokens := Tokens + Before}};
+charged({error, Why, Tokens}, Before) ->
+    {error, Why, Before + Tokens}.
 
 %% Wait only before hitting the SAME provider again.
 pause_before([{Next, _Key} | _], Config, N) ->
@@ -357,11 +413,17 @@ once(Config, Body, Key) ->
         {ok, {{_Version, 200, _Reason}, _Headers, Response}} ->
             parse(Response, byte_size(Body));
         {ok, {{_Version, 429, _Reason}, Headers, Response}} ->
-            {error, {http_status, 429, clip(Response), retry_after(Headers)}};
+            %% ⚠ A REFUSED REQUEST COSTS NOTHING HERE, AND THAT IS DELIBERATE. A
+            %% 429, a 500 or an unreachable host is a request the provider did
+            %% not answer: there is no usage to carry, and charging an estimate
+            %% for it would drive a mind with a broken pool into `resting' for a
+            %% spend that never happened, which stops it speaking instead of
+            %% keeping it trying. Only a 200 that produced something costs.
+            {error, {http_status, 429, clip(Response), retry_after(Headers)}, 0};
         {ok, {{_Version, Status, _Reason}, _Headers, Response}} ->
-            {error, {http_status, Status, clip(Response)}};
+            {error, {http_status, Status, clip(Response)}, 0};
         {error, Reason} ->
-            {error, {unreachable, Reason}}
+            {error, {unreachable, Reason}, 0}
     end.
 
 %% A rate limit usually says when to come back. Discarding the headers threw
@@ -386,24 +448,29 @@ parse(Response, RequestBytes) ->
     try jsx:decode(Response, [return_maps]) of
         Decoded -> parsed(Decoded, RequestBytes)
     catch
-        _:_ -> {error, {not_json, clip(Response)}}
+        _:_ -> {error, {not_json, clip(Response)}, estimate(RequestBytes, <<>>)}
     end.
 
 parsed(#{<<"choices">> := [#{<<"message">> := Message} | _] = Choices} = Decoded, RequestBytes) ->
     content(Message, finish(Choices), Decoded, RequestBytes);
-parsed(_Unexpected, _RequestBytes) ->
-    {error, no_choice}.
+parsed(Decoded, RequestBytes) ->
+    {error, no_choice, used(Decoded, RequestBytes, <<>>)}.
 
 %% A reply the endpoint cut off is not a post. `length` means the model was
 %% still writing when it ran out of room, and what came back is a paragraph
 %% ending mid-sentence: publishing that is worse than saying nothing, and
 %% treating it as silence would hide a budget that is too small.
-content(_Message, <<"length">>, _Decoded, _RequestBytes) ->
-    {error, truncated};
+%%
+%% ⚠ AND IT IS NOT FREE EITHER. The endpoint reports what it charged for the
+%% thinking it did, including the thinking that produced the sentence it was
+%% cut off in the middle of. Discarding that number is how a pool that truncates
+%% every reply spent without limit: the cap counted the turns that worked and
+%% called the failures free.
+content(Message, <<"length">>, Decoded, RequestBytes) ->
+    {error, truncated, used(Decoded, RequestBytes, text(maps:get(<<"content">>, Message, <<>>)))};
 content(Message, _FinishReason, Decoded, RequestBytes) ->
     Body = text(maps:get(<<"content">>, Message, <<>>)),
-    {ok, #{body => Body,
-           tokens => tokens(maps:get(<<"usage">>, Decoded, undefined), RequestBytes, Body)}}.
+    {ok, #{body => Body, tokens => used(Decoded, RequestBytes, Body)}}.
 
 finish([#{<<"finish_reason">> := Reason} | _]) -> Reason;
 finish([_Other | Rest])                        -> finish(Rest);
@@ -411,6 +478,9 @@ finish([])                                     -> undefined.
 
 text(Content) when is_binary(Content) -> Content;
 text(_NotText)                        -> <<>>.
+
+used(Decoded, RequestBytes, Content) ->
+    tokens(maps:get(<<"usage">>, Decoded, undefined), RequestBytes, Content).
 
 %% What the endpoint says it cost, or an estimate when it declines to say:
 %% characters over four, which is the usual rule of thumb for English prose and
@@ -420,6 +490,9 @@ tokens(#{<<"total_tokens">> := Total}, _RequestBytes, _Content)
   when is_integer(Total), Total >= 0 ->
     Total;
 tokens(_UnsaidOrUnusable, RequestBytes, Content) ->
+    estimate(RequestBytes, Content).
+
+estimate(RequestBytes, Content) ->
     (RequestBytes + byte_size(Content)) div ?CHARS_PER_TOKEN.
 
 %% --- the request ---

@@ -15,11 +15,19 @@
 %% one long-lived process across this module, exactly as it is in the service,
 %% so its memory of taken items is shared state, and a test that ignored that
 %% would be asserting the order the tests happen to run in.
+%%
+%% ⚠ AND THE TURN IS A CAST, SO THE OUTCOME IS A COUNTER, NOT A RETURN VALUE.
+%% The wire hands a fact over without waiting (the pool made a turn as long as
+%% every provider's patience added together, which is longer than a wire
+%% subscriber may block), so a test reads what happened the way the service does:
+%% from the mind's own report. `delta/1' is that read, and it is also the barrier,
+%% because a call from this process lands behind the cast this process just made.
 -module(spartan_mind_tests).
 
 -include_lib("eunit/include/eunit.hrl").
 
 -define(POSTS, spartan_mind_test_posts).
+-define(COUNTERS, [turns, published, silent, duplicates, clocked, rested, refused, failed]).
 
 mind_test_() ->
     {setup, fun open/0, fun close/1,
@@ -30,9 +38,11 @@ mind_test_() ->
           fun the_clock_holds_the_next_story/0,
           fun a_failed_turn_still_takes_the_item/0,
           fun a_failed_turn_starts_the_clock/0,
+          fun a_failed_turn_is_charged/0,
           fun the_cap_makes_it_rest/0,
           fun the_cap_rolls_over_at_midnight/0,
-          fun what_it_spent_is_on_disk/0]
+          fun what_it_spent_is_on_disk/0,
+          fun a_slow_turn_does_not_hold_the_wire/0]
      end}.
 
 %%====================================================================
@@ -42,15 +52,15 @@ mind_test_() ->
 refused_without_an_id() ->
     ok = forget(),
     ok = answering(<<"A post.">>, 10),
-    ?assertEqual(refused, spartan_mind:think(#{title => {text, <<"no id">>}})),
+    ?assertEqual(#{refused => 1}, delta(#{title => {text, <<"no id">>}})),
     ?assertEqual(0, meck:num_calls(mind_llm, reason, 2)),
     ?assertEqual(0, published_count()).
 
 one_post_for_one_item() ->
     ok = forget(),
     ok = answering(<<"A post about the match.">>, 12),
-    ?assertMatch({published, _PostId}, spartan_mind:think(fact(<<"a1">>))),
-    ?assertMatch({published, _PostId}, spartan_mind:think(fact(<<"a2">>))),
+    ?assertEqual(#{turns => 1, published => 1}, delta(fact(<<"a1">>))),
+    ?assertEqual(#{turns => 1, published => 1}, delta(fact(<<"a2">>))),
     ?assertEqual(2, published_count()),
     {Topic, Payload} = next_published(),
     ?assertEqual(<<"io.macula/mcl-spartan/agora/wire/agora_post_published_v1">>, Topic),
@@ -75,8 +85,8 @@ one_post_for_one_item() ->
 a_second_delivery_is_a_duplicate() ->
     ok = forget(),
     ok = answering(<<"A post.">>, 10),
-    ?assertMatch({published, _}, spartan_mind:think(fact(<<"b1">>))),
-    ?assertEqual(duplicate, spartan_mind:think(fact(<<"b1">>))),
+    ?assertEqual(#{turns => 1, published => 1}, delta(fact(<<"b1">>))),
+    ?assertEqual(#{duplicates => 1}, delta(fact(<<"b1">>))),
     ?assertEqual(1, meck:num_calls(mind_llm, reason, 2)),
     ?assertEqual(1, published_count()).
 
@@ -89,8 +99,8 @@ the_clock_holds_the_next_story() ->
     %% story the test before this one opened is still inside the window.
     _ = restarted(),
     ok = answering(<<"A post.">>, 10),
-    ?assertMatch({published, _}, spartan_mind:think(fact(<<"c1">>))),
-    ?assertEqual(clock, spartan_mind:think(fact(<<"c2">>))),
+    ?assertEqual(#{turns => 1, published => 1}, delta(fact(<<"c1">>))),
+    ?assertEqual(#{clocked => 1}, delta(fact(<<"c2">>))),
     ?assertEqual(1, meck:num_calls(mind_llm, reason, 2)),
     %% Back off, so the tests after this one are about their own subject.
     application:set_env(mcl_spartan, opening_clock_ms, 0).
@@ -102,13 +112,34 @@ a_failed_turn_still_takes_the_item() ->
     ok = forget(),
     meck:expect(mind_llm, reason,
                 fun(_Charter, _Prompt) ->
-                    {error, {all_backends_exhausted, "endpoint", {http_status, 500, <<"oops">>}}}
+                    {error, {all_backends_exhausted, "endpoint",
+                             {http_status, 500, <<"oops">>}}, 0}
                 end),
-    ?assertMatch({failed, _}, spartan_mind:think(fact(<<"d1">>))),
+    ?assertEqual(#{failed => 1}, delta(fact(<<"d1">>))),
     ?assertEqual(1, meck:num_calls(mind_llm, reason, 2)),
-    ?assertEqual(duplicate, spartan_mind:think(fact(<<"d1">>))),
+    ?assertEqual(#{duplicates => 1}, delta(fact(<<"d1">>))),
     ?assertEqual(1, meck:num_calls(mind_llm, reason, 2)),
     ?assertEqual(0, published_count()).
+
+%% ⚠ A TURN THAT FAILED IS NOT A FREE TURN. A pool that truncates every reply
+%% spends at every slot it tried, and the number mind_llm reports for the failure
+%% is what the day's allowance loses. Without this the cap counted the turns that
+%% worked and called the failures free, which is a cap a failing pool spends
+%% straight through.
+a_failed_turn_is_charged() ->
+    ok = forget(),
+    application:set_env(mcl_spartan, daily_token_cap, 1000),
+    ok = mind_budget:save(#{day => mind_budget:day(), spent => 0}),
+    _ = restarted(),
+    meck:expect(mind_llm, reason,
+                fun(_Charter, _Prompt) ->
+                    {error, {all_backends_exhausted, "nvidia", truncated}, 321}
+                end),
+    ?assertEqual(#{failed => 1}, delta(fact(<<"i1">>))),
+    #{budget := Budget} = spartan_mind:report(),
+    ?assertEqual(321, maps:get(spent, Budget)),
+    %% And the ledger on disk agrees, so the charge survives a restart too.
+    ?assertEqual(321, maps:get(spent, mind_budget:report(mind_budget:load()))).
 
 the_cap_makes_it_rest() ->
     ok = forget(),
@@ -116,7 +147,7 @@ the_cap_makes_it_rest() ->
     #{spent := Spent} = mind_budget:report(mind_budget:load()),
     ok = mind_budget:save(#{day => mind_budget:day(), spent => Spent + 5}),
     _ = restarted(),
-    ?assertEqual(resting, spartan_mind:think(fact(<<"e1">>))),
+    ?assertEqual(#{rested => 1}, delta(fact(<<"e1">>))),
     ?assertEqual(0, meck:num_calls(mind_llm, reason, 2)),
     ?assertEqual(0, published_count()).
 
@@ -130,10 +161,10 @@ a_failed_turn_starts_the_clock() ->
     meck:expect(mind_llm, reason,
                 fun(_Charter, _Prompt) ->
                     {error, {all_backends_exhausted, "endpoint",
-                             {http_status, 429, <<"slow down">>, undefined}}}
+                             {http_status, 429, <<"slow down">>, undefined}}, 0}
                 end),
-    ?assertMatch({failed, _}, spartan_mind:think(fact(<<"h1">>))),
-    ?assertEqual(clock, spartan_mind:think(fact(<<"h2">>))),
+    ?assertEqual(#{failed => 1}, delta(fact(<<"h1">>))),
+    ?assertEqual(#{clocked => 1}, delta(fact(<<"h2">>))),
     ?assertEqual(1, meck:num_calls(mind_llm, reason, 2)),
     application:set_env(mcl_spartan, opening_clock_ms, 0).
 
@@ -146,7 +177,7 @@ the_cap_rolls_over_at_midnight() ->
     ok = mind_budget:save(#{day => mind_budget:day() - 1, spent => 500}),
     _ = restarted(),
     ok = answering(<<"A post.">>, 10),
-    ?assertMatch({published, _}, spartan_mind:think(fact(<<"g1">>))),
+    ?assertEqual(#{turns => 1, published => 1}, delta(fact(<<"g1">>))),
     #{budget := Budget} = spartan_mind:report(),
     ?assertEqual(10, maps:get(spent, Budget)).
 
@@ -156,12 +187,38 @@ what_it_spent_is_on_disk() ->
     ok = mind_budget:save(#{day => mind_budget:day(), spent => 0}),
     _ = restarted(),
     ok = answering(<<"A post.">>, 12),
-    ?assertMatch({published, _}, spartan_mind:think(fact(<<"f1">>))),
+    ?assertEqual(#{turns => 1, published => 1}, delta(fact(<<"f1">>))),
     #{budget := Budget} = spartan_mind:report(),
     ?assertEqual(12, maps:get(spent, Budget)),
     %% And the ledger on disk says the same, which is what makes the cap
     %% survive a restart instead of being a speed bump.
     ?assertEqual(12, maps:get(spent, mind_budget:report(mind_budget:load()))).
+
+%% @doc ⚠ THE TURN IS OFF THE WIRE SUBSCRIBER. A pool makes a turn as long as
+%% every provider's patience added together, and the subscriber used to make that
+%% turn synchronously and be restarted for it, dropping whatever facts it was
+%% holding. What is pinned is the subscriber returning while the mind is still
+%% thinking, and the fact still being dealt with afterwards.
+%%
+%% The margin is deliberately loose: this asserts "does not wait", not a latency
+%% budget, and a loaded box is allowed to be slow.
+a_slow_turn_does_not_hold_the_wire() ->
+    ok = forget(),
+    meck:expect(mind_llm, reason,
+                fun(_Charter, _Prompt) ->
+                    timer:sleep(1000),
+                    {ok, #{body => <<"A slow post.">>, tokens => 5}}
+                end),
+    Started = erlang:monotonic_time(millisecond),
+    {noreply, Wire} = on_news_item_reported_maybe_open_a_turn:handle_event(
+                        <<"io.macula/mcl-news/news/wire/news_item_reported_v1">>,
+                        fact(<<"j1">>), #{}, #{offered => 0, refused => 0}),
+    Waited = erlang:monotonic_time(millisecond) - Started,
+    ?assertEqual(#{offered => 1, refused => 0}, Wire),
+    ?assert(Waited < 800),
+    %% And the turn it handed over still runs to the end.
+    #{published := Published} = spartan_mind:report(),
+    ?assert(Published >= 1).
 
 %%====================================================================
 %% Setup
@@ -265,3 +322,22 @@ forget() ->
     ets:insert(?POSTS, {posts, []}),
     meck:reset(mind_llm),
     ok.
+
+%% What ONE fact moved, in the mind's own counts. The mind is one long-lived
+%% process across this module, exactly as it is in the service, so a test that
+%% read the totals would be asserting the order the tests happen to run in.
+%%
+%% Asking for the report is also the barrier: the turn is a cast, and a call from
+%% this process lands behind the cast this process just made.
+delta(Item) ->
+    Before = spartan_mind:report(),
+    ok = spartan_mind:think(Item),
+    moved(maps:with(?COUNTERS, Before), maps:with(?COUNTERS, spartan_mind:report())).
+
+moved(Before, After) ->
+    maps:fold(fun(Key, Now, Acc) ->
+                  case Now - maps:get(Key, Before, 0) of
+                      0 -> Acc;
+                      Moved -> Acc#{Key => Moved}
+                  end
+              end, #{}, After).

@@ -51,6 +51,29 @@ but a statement about the next few minutes. W3 of the agora walking skeleton
   unknown field answers 400, which the schedule reads as the moment and fails
   over from: a healthy backend would be skipped every turn in silence.
 
+- **A turn that failed is charged.** Two things the pool made true that the code
+  did not yet do. A 200 whose reply this code cannot use (cut off by the token
+  limit, a body that is not JSON, no choice in it) has already cost what the
+  endpoint reports, and a walk that gave up after three slots spent at three, so
+  the failure carries that cost and the mind charges it. Only a REFUSED request
+  is free, because a 429 or an unreachable host is one the provider did not
+  answer at all. Charging only the turns that worked is a cap a failing pool
+  spends straight through.
+
+- **The wire no longer waits for a turn.** `think/1` is a cast. A turn can now
+  take as long as every provider's patience added together, and the wire
+  subscriber made that turn synchronously, so a slow pool exited the subscriber
+  and dropped whatever facts it was holding: a dropped fact and a quiet wire look
+  exactly alike, which is the one failure this service cannot see. The mind
+  serialises itself instead, and the facts that queue behind a turn are answered
+  by the gates in microseconds.
+
+- **A provider that does not make it into the schedule says so.** A name this
+  code does not know, or a keyed provider with no key, is dropped by design; it
+  is dropped out loud now, once per schedule, which is the difference between a
+  pool of three and a pool of one that nothing reports. The report a health check
+  reads builds no schedule, so it stays quiet.
+
 - **Tests ported from hecate-spartan and extended.** `mind_breaker_tests` covers
   the breaker's two opposite obligations, remember a rate limit and fail open.
   `mind_providers_tests` covers how a pool is read from the environment and, new,

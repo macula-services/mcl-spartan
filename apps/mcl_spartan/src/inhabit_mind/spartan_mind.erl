@@ -18,6 +18,12 @@
 %%% money later, and being late to a story is a smaller fault than paying twice
 %%% for it.
 %%%
+%%% AND THE QUEUE IS THE MAILBOX, NOT A WORK LIST. The wire hands a fact over
+%%% without waiting (see think/1), so a fact that arrives while a turn is running
+%%% waits in this process's own queue and is then answered by these gates in
+%%% microseconds. What the design forbids is a fact held back for a LATER paid
+%%% turn, and the clock above is what forbids it.
+%%%
 %%% THE ITEM IS MARKED AS TAKEN BEFORE THE CALL, not after. A turn that fails
 %%% leaves that item taken, so a flapping endpoint cannot be handed the same
 %%% story every time it manages to answer.
@@ -29,7 +35,6 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -define(OPENING_CLOCK_DEFAULT_MS, 60000).
--define(CALL_TIMEOUT_MS, 45000).
 -define(OPENED_WINDOW, 2000).
 
 -record(mind, {name                    :: binary(),
@@ -55,11 +60,23 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-%% @doc Offer one fact from the wire to the mind. Answers what it did with it,
-%% which is what the subscriber counts and what the tests read.
--spec think(map()) -> {atom(), term()}.
+%% @doc Offer one fact from the wire to the mind.
+%%
+%% ⚠ THIS IS A CAST, AND IT WAS A CALL. It is made from the wire subscriber's own
+%% process, so a synchronous turn held that subscriber for as long as the turn
+%% took, and the pool made that unbounded: a walk can spend every provider's
+%% patience one after another, and the local floor is patient enough on its own
+%% to outlast any caller. A subscriber that takes too long is restarted and the
+%% facts it was holding are gone, which is the one failure this service cannot
+%% see, because a dropped fact and a quiet wire look exactly alike.
+%%
+%% The mind serialises itself instead: facts queue behind the turn in progress
+%% and are decided by the gates below, which cost a comparison rather than a
+%% call, so the queue drains as fast as it forms. What the turn did with the fact
+%% is in the mind's own report, which is where the outcome was always readable.
+-spec think(map()) -> ok.
 think(Item) ->
-    gen_server:call(?MODULE, {think, Item}, ?CALL_TIMEOUT_MS * 2).
+    gen_server:cast(?MODULE, {think, Item}).
 
 %% @doc Whether the mind is well. Being out of budget is not unwell: a resting
 %% mind is green, and its report is where that is visible.
@@ -89,17 +106,18 @@ init([]) ->
                charter = mcl_spartan_service:charter(),
                budget = mind_budget:load()}}.
 
-%% @private One call, one turn, answered synchronously: the subscriber that
-%% handed the fact over is the only caller, and it wants to know the outcome.
-handle_call({think, Item}, _From, St) ->
-    {Outcome, St1} = turn(Item, St),
-    {reply, Outcome, St1};
+%% @private One fact, one turn, and nobody waiting on the answer: the caller is
+%% the wire subscriber, which has to stay responsive while a turn runs, and the
+%% mind's own counters are where the outcome lands.
+handle_cast({think, Item}, St) ->
+    {_Outcome, St1} = turn(Item, St),
+    {noreply, St1};
+handle_cast(_Msg, St) -> {noreply, St}.
+
 handle_call(report, _From, St) ->
     {reply, report_of(St), St};
 handle_call(_Other, _From, St) ->
     {reply, {error, unknown_request}, St}.
-
-handle_cast(_Msg, St) -> {noreply, St}.
 handle_info(_Info, St) -> {noreply, St}.
 terminate(_Reason, _St) -> ok.
 
@@ -171,16 +189,33 @@ reasoned(ItemId, Stimulus, St) ->
     case mind_llm:reason(St1#mind.charter, prompt(Stimulus)) of
         {ok, #{body := Body, tokens := Tokens}} ->
             spoke(ItemId, Body, Tokens, Stimulus, St1);
-        {error, Reason} ->
-            logger:warning("[spartan] turn failed for item ~s: ~p", [ItemId, Reason]),
-            {{failed, Reason}, St1#mind{failed = St1#mind.failed + 1}}
+        {error, Reason, Tokens} ->
+            failed(ItemId, Reason, Tokens, St1)
     end.
 
+%% ⚠ A TURN THAT FAILED IS NOT A FREE TURN, and it is charged here. A pool that
+%% truncates every reply spends at every slot it tried, and a turn that gave up
+%% after three providers spent at all three. Charging only the turns that worked
+%% is a cap a failing pool spends straight through, which is the opposite of what
+%% a cap is for. The cost is the one mind_llm reports for the failure, which is
+%% zero for a provider that refused the request outright.
+failed(ItemId, Reason, Tokens, St) ->
+    St1 = charged(Tokens, St),
+    logger:warning("[spartan] turn failed for item ~s: ~p", [ItemId, Reason]),
+    {{failed, Reason}, St1#mind{failed = St1#mind.failed + 1}}.
+
 spoke(ItemId, Body, Tokens, Stimulus, St) ->
+    St1 = charged(Tokens, St#mind{turns = St#mind.turns + 1}),
+    spoke_of(ItemId, maybe_publish_to_agora:maybe_publish(St1#mind.name, Body, Stimulus), St1).
+
+%% What a turn cost, written after every turn that spent anything, so a restart
+%% costs at most one turn rather than the whole day.
+charged(0, St) ->
+    St;
+charged(Tokens, St) ->
     Budget = mind_budget:spend(St#mind.budget, Tokens),
     ok = mind_budget:save(Budget),
-    St1 = St#mind{budget = Budget, turns = St#mind.turns + 1},
-    spoke_of(ItemId, maybe_publish_to_agora:maybe_publish(St1#mind.name, Body, Stimulus), St1).
+    St#mind{budget = Budget}.
 
 spoke_of(ItemId, {published, PostId}, St) ->
     logger:info("[spartan] ~s posted ~s about item ~s (~p tokens today)",

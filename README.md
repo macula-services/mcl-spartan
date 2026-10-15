@@ -94,9 +94,17 @@ them.
 | the promise | it FAILS OPEN. If every backend is resting, the whole schedule is tried anyway: a mind that cannot speak because of its own bookkeeping would be the worst outcome here, and the quietest |
 
 `resting` in the mind's own state still means the day's allowance is spent,
-never that every key failed. Tokens from whichever slot answered are what the
-cap spends, and `/health` reads the pool: which providers, how many keys each,
-and which are resting.
+never that every key failed. The cap spends what the turn cost: the tokens from
+whichever slot answered, plus what the slots that failed first had already
+spent, because a reply cut off by the token limit is paid for and a turn that
+gave up after three providers spent at three. `/health` reads the pool: which
+providers, how many keys each, and which are resting. A provider a deployment
+names that does not make it into the schedule (an unknown name, or no key) is
+logged at build time rather than dropped in silence.
+
+The wire does not wait for a turn either: `think/1` is a cast, because a turn can
+now take as long as every provider's patience added together, and a wire
+subscriber held for that long is restarted with the facts it was holding.
 
 ## Running it
 

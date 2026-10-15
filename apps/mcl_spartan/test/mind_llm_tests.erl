@@ -94,7 +94,38 @@ a_provider_model_from_the_environment_is_a_json_string_test() ->
 %% with no opinion.
 a_reply_cut_off_by_the_token_limit_is_refused_test() ->
     _ = with_endpoint(200, truncated_answer(<<"A paragraph that stops mid">>)),
-    ?assertMatch({error, {all_backends_exhausted, "endpoint", truncated}},
+    ?assertMatch({error, {all_backends_exhausted, "endpoint", truncated}, _Tokens},
+                 mind_llm:reason(<<"charter">>, <<"prompt">>)).
+
+%% ⚠ A REPLY THIS CODE CANNOT USE STILL COST SOMETHING, AND THE COST IS CARRIED.
+%% The endpoint reports what it charged for the thinking that produced the
+%% sentence it was cut off in the middle of, and discarding that number is how a
+%% pool that truncates every reply spends without limit: the cap counted the
+%% turns that worked and called the failures free.
+a_cut_off_reply_that_reported_its_cost_carries_it_test() ->
+    _ = with_endpoint(200, truncated_answer(<<"A paragraph that stops mid">>, 500)),
+    ?assertEqual({error, {all_backends_exhausted, "endpoint", truncated}, 500},
+                 mind_llm:reason(<<"charter">>, <<"prompt">>)).
+
+%% @doc A turn that spent tokens at one slot before another answered is charged
+%% for BOTH: the truncation is part of the price of the turn the next provider
+%% finished.
+a_slot_that_failed_is_paid_for_by_the_next_one_test() ->
+    clear_breaker(),
+    _ = with_pool(200, truncated_answer(<<"A paragraph that stops mid">>, 500),
+                  200, answer(<<"A post from the next slot.">>, 20)),
+    {ok, Reply} = mind_llm:reason(<<"charter">>, <<"prompt">>),
+    ?assertEqual(<<"A post from the next slot.">>, maps:get(body, Reply)),
+    ?assertEqual(520, maps:get(tokens, Reply)).
+
+%% @doc And a turn that gave up after walking the whole schedule carries every
+%% slot it walked, which is what stops a pool that fails everywhere from
+%% spending for free.
+a_turn_that_gave_up_spends_what_it_tried_test() ->
+    clear_breaker(),
+    _ = with_pool(200, truncated_answer(<<"Cut off here">>, 500),
+                  200, truncated_answer(<<"Also cut off">>, 300)),
+    ?assertEqual({error, {all_backends_exhausted, "local", truncated}, 800},
                  mind_llm:reason(<<"charter">>, <<"prompt">>)).
 
 %% What the endpoint reported is what is counted, because the daily cap spends
@@ -115,22 +146,35 @@ an_endpoint_that_reports_no_usage_still_spends_test() ->
 
 %% A turn that dies says which backend killed it and why, so the log is the
 %% place the next person finds out, rather than a bare "turn failed".
+%% A REFUSED REQUEST IS FREE, AND THAT IS DELIBERATE: a 429 is a request the
+%% provider did not answer, so there is no usage to carry, and charging an
+%% estimate for it would drive a mind with a broken pool into `resting' for a
+%% spend that never happened.
 a_refused_call_is_an_error_and_not_an_empty_post_test() ->
     _ = with_endpoint(429, <<"{\"error\":\"rate limited\"}">>),
-    ?assertMatch({error, {all_backends_exhausted, "endpoint", {http_status, 429, _, undefined}}},
+    ?assertMatch({error, {all_backends_exhausted, "endpoint", {http_status, 429, _, undefined}}, 0},
                  mind_llm:reason(<<"charter">>, <<"prompt">>)).
 
 %% A 429 usually says how long the quota is gone for, and that header is the
 %% only thing the breaker has to go on: dropping it means resting for a guess.
 a_told_rate_limit_reaches_the_breaker_whole_test() ->
     _ = with_endpoint(429, <<"{\"error\":\"rate limited\"}">>, ["retry-after: 7\r\n"]),
-    ?assertMatch({error, {all_backends_exhausted, "endpoint", {http_status, 429, _, 7}}},
+    ?assertMatch({error, {all_backends_exhausted, "endpoint", {http_status, 429, _, 7}}, 0},
                  mind_llm:reason(<<"charter">>, <<"prompt">>)).
 
 a_reply_that_is_not_an_answer_is_refused_test() ->
     _ = with_endpoint(200, <<"{\"nothing\":\"here\"}">>),
-    ?assertMatch({error, {all_backends_exhausted, "endpoint", no_choice}},
-                 mind_llm:reason(<<"charter">>, <<"prompt">>)).
+    {error, {all_backends_exhausted, "endpoint", no_choice}, Tokens} =
+        mind_llm:reason(<<"charter">>, <<"prompt">>),
+    ?assert(Tokens > 0).
+
+%% A body that is not JSON has nothing reported at all, so it is estimated
+%% rather than called free: it was still a request the endpoint answered.
+a_body_that_is_not_json_is_estimated_test() ->
+    _ = with_endpoint(200, <<"<html>a gateway</html>">>),
+    {error, {all_backends_exhausted, "endpoint", {not_json, _Body}}, Tokens} =
+        mind_llm:reason(<<"charter">>, <<"prompt">>),
+    ?assert(Tokens > 0).
 
 %% @doc THE POINT OF THE CAROUSEL. A rate-limited provider does not end the
 %% turn: the next slot answers, the body that comes back is that slot's, and the
@@ -168,7 +212,7 @@ a_busy_provider_is_rotated_past_and_not_rested_test() ->
 a_failed_last_slot_is_recorded_test() ->
     clear_breaker(),
     _ = with_endpoint(429, <<"{\"error\":\"rate limited\"}">>),
-    ?assertMatch({error, {all_backends_exhausted, "endpoint", _Why}},
+    ?assertMatch({error, {all_backends_exhausted, "endpoint", _Why}, _Tokens},
                  mind_llm:reason(<<"charter">>, <<"prompt">>)),
     ?assertEqual(["endpoint"], resting_providers()).
 
@@ -336,3 +380,10 @@ answer_without_usage(Body) ->
 truncated_answer(Body) ->
     jsx:encode(#{<<"choices">> => [#{<<"message">> => #{<<"content">> => Body},
                                     <<"finish_reason">> => <<"length">>}]}).
+
+%% A cut-off reply from an endpoint that still says what it charged for it,
+%% which is the normal case: the thinking happened, and the answer did not fit.
+truncated_answer(Body, Total) ->
+    jsx:encode(#{<<"choices">> => [#{<<"message">> => #{<<"content">> => Body},
+                                    <<"finish_reason">> => <<"length">>}],
+                 <<"usage">> => #{<<"total_tokens">> => Total}}).
