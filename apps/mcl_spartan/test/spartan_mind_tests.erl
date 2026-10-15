@@ -101,7 +101,9 @@ the_clock_holds_the_next_story() ->
 a_failed_turn_still_takes_the_item() ->
     ok = forget(),
     meck:expect(mind_llm, reason,
-                fun(_Charter, _Prompt) -> {error, {http_status, 500, <<"oops">>}} end),
+                fun(_Charter, _Prompt) ->
+                    {error, {all_backends_exhausted, "endpoint", {http_status, 500, <<"oops">>}}}
+                end),
     ?assertMatch({failed, _}, spartan_mind:think(fact(<<"d1">>))),
     ?assertEqual(1, meck:num_calls(mind_llm, reason, 2)),
     ?assertEqual(duplicate, spartan_mind:think(fact(<<"d1">>))),
@@ -126,7 +128,10 @@ a_failed_turn_starts_the_clock() ->
     application:set_env(mcl_spartan, opening_clock_ms, 60000),
     _ = restarted(),
     meck:expect(mind_llm, reason,
-                fun(_Charter, _Prompt) -> {error, {http_status, 429, <<"slow down">>}} end),
+                fun(_Charter, _Prompt) ->
+                    {error, {all_backends_exhausted, "endpoint",
+                             {http_status, 429, <<"slow down">>, undefined}}}
+                end),
     ?assertMatch({failed, _}, spartan_mind:think(fact(<<"h1">>))),
     ?assertEqual(clock, spartan_mind:think(fact(<<"h2">>))),
     ?assertEqual(1, meck:num_calls(mind_llm, reason, 2)),

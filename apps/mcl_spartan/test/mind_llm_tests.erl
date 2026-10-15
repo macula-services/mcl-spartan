@@ -1,9 +1,14 @@
-%% @doc The one call: the request that goes out, and what comes back.
+%% @doc The call: the request that goes out, and what comes back.
 %%
 %% The mind's tests fake this module, so without a test like this the HTTP path
 %% would first run for real on a box, which is the wrong place to find out what
 %% an endpoint says. A stub on loopback exercises the real request, the real
 %% parse and the real token count, and needs neither a key nor a network.
+%%
+%% The cases set the environment directly and leave it set: every one of them
+%% runs under the same small world (one named endpoint, or a named pair), and
+%% `mind_providers_tests` is the module that puts the environment back, because
+%% it is the one that varies it.
 -module(mind_llm_tests).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -34,7 +39,7 @@ the_call_carries_the_charter_and_the_item_test() ->
     ?assertMatch({_, _}, binary:match(Request, <<"\"max_tokens\":64">>)).
 
 %% The default has to leave a reasoning model room to think AND to write, or the
-%% post this increment exists to make comes down to how long it thought.
+%% post this service exists to make comes down to how long it thought.
 the_default_output_ceiling_leaves_room_to_write_test() ->
     _ = application:unset_env(mcl_spartan, mind_max_tokens),
     ?assertEqual(1024, mind_llm:max_tokens()).
@@ -73,13 +78,24 @@ a_text_setting_from_the_deploy_file_is_a_json_string_test() ->
     ?assert(is_binary(mind_llm:endpoint())),
     ?assert(is_binary(mind_llm:model())).
 
+%% The same lesson, for a provider whose model comes from the command line
+%% rather than from sys.config: a provider setting that arrives as a string and
+%% leaves as one would put the code-point array on the wire again.
+a_provider_model_from_the_environment_is_a_json_string_test() ->
+    _ = with_local_endpoint(200, answer(<<"A post.">>, 42), "local-model"),
+    {ok, _} = mind_llm:reason(<<"charter">>, <<"prompt">>),
+    Request = last_request(),
+    ?assertMatch({_, _}, binary:match(Request, <<"\"model\":\"local-model\"">>)),
+    ?assertEqual(nomatch, binary:match(Request, <<"\"model\":[">>)).
+
 %% A reply the endpoint cut off is NOT a post. What comes back is a paragraph
 %% ending mid-sentence, and an empty one reads here as "nothing to say", so
 %% without this the failure is silent, spends its tokens, and looks like a mind
 %% with no opinion.
 a_reply_cut_off_by_the_token_limit_is_refused_test() ->
     _ = with_endpoint(200, truncated_answer(<<"A paragraph that stops mid">>)),
-    ?assertEqual({error, truncated}, mind_llm:reason(<<"charter">>, <<"prompt">>)).
+    ?assertMatch({error, {all_backends_exhausted, "endpoint", truncated}},
+                 mind_llm:reason(<<"charter">>, <<"prompt">>)).
 
 %% What the endpoint reported is what is counted, because the daily cap spends
 %% that number.
@@ -97,46 +113,154 @@ an_endpoint_that_reports_no_usage_still_spends_test() ->
     ?assert(is_integer(Tokens)),
     ?assert(Tokens > 0).
 
+%% A turn that dies says which backend killed it and why, so the log is the
+%% place the next person finds out, rather than a bare "turn failed".
 a_refused_call_is_an_error_and_not_an_empty_post_test() ->
     _ = with_endpoint(429, <<"{\"error\":\"rate limited\"}">>),
-    ?assertMatch({error, {http_status, 429, _}}, mind_llm:reason(<<"charter">>, <<"prompt">>)).
+    ?assertMatch({error, {all_backends_exhausted, "endpoint", {http_status, 429, _, undefined}}},
+                 mind_llm:reason(<<"charter">>, <<"prompt">>)).
+
+%% A 429 usually says how long the quota is gone for, and that header is the
+%% only thing the breaker has to go on: dropping it means resting for a guess.
+a_told_rate_limit_reaches_the_breaker_whole_test() ->
+    _ = with_endpoint(429, <<"{\"error\":\"rate limited\"}">>, ["retry-after: 7\r\n"]),
+    ?assertMatch({error, {all_backends_exhausted, "endpoint", {http_status, 429, _, 7}}},
+                 mind_llm:reason(<<"charter">>, <<"prompt">>)).
 
 a_reply_that_is_not_an_answer_is_refused_test() ->
     _ = with_endpoint(200, <<"{\"nothing\":\"here\"}">>),
-    ?assertEqual({error, no_choice}, mind_llm:reason(<<"charter">>, <<"prompt">>)).
+    ?assertMatch({error, {all_backends_exhausted, "endpoint", no_choice}},
+                 mind_llm:reason(<<"charter">>, <<"prompt">>)).
+
+%% @doc THE POINT OF THE CAROUSEL. A rate-limited provider does not end the
+%% turn: the next slot answers, the body that comes back is that slot's, and the
+%% tokens that reach the daily budget are the ones the answering slot reported.
+%% The breaker remembers the refusal, which is what stops the NEXT turn paying
+%% for it again.
+a_rate_limited_provider_falls_to_the_next_slot_test() ->
+    clear_breaker(),
+    _ = with_pool(429, <<"{\"error\":\"rate limited\"}">>,
+                  200, answer(<<"A post from the floor.">>, 321)),
+    {ok, Reply} = mind_llm:reason(<<"charter">>, <<"prompt">>),
+    ?assertEqual(<<"A post from the floor.">>, maps:get(body, Reply)),
+    ?assertEqual(321, maps:get(tokens, Reply)),
+    ?assertEqual(["endpoint", "local"], providers()),
+    ?assertEqual(["endpoint"], resting_providers()).
+
+%% @doc The deliberate deviation from the reference: a turn that dies on its
+%% LAST slot is still a failure of that backend, so the breaker rests it. With
+%% one provider configured, which is what is live today, the reference left the
+%% breaker dead exactly where it matters most and would have rediscovered the
+%% same rate limit on every turn.
+a_failed_last_slot_is_recorded_test() ->
+    clear_breaker(),
+    _ = with_endpoint(429, <<"{\"error\":\"rate limited\"}">>),
+    ?assertMatch({error, {all_backends_exhausted, "endpoint", _Why}},
+                 mind_llm:reason(<<"charter">>, <<"prompt">>)),
+    ?assertEqual(["endpoint"], resting_providers()).
+
+%% @doc A provider that does not declare `reasoning_effort` is not sent it. A
+%% provider that rejects an unknown field answers 400, which the schedule reads
+%% as the moment rather than the backend and fails over from, so a healthy
+%% backend would be skipped every turn in silence.
+a_provider_that_does_not_take_reasoning_effort_is_not_sent_it_test() ->
+    _ = with_local_endpoint(200, answer(<<"A post.">>, 42), "local-model"),
+    {ok, _} = mind_llm:reason(<<"charter">>, <<"prompt">>),
+    Request = last_request(),
+    ?assertEqual(nomatch, binary:match(Request, <<"reasoning_effort">>)),
+    ?assertMatch({_, _}, binary:match(Request, <<"post /v1/chat/completions">>)).
+
+%% @doc The keyless floor is called with no credential at all, rather than with
+%% a placeholder bearer: the call is the point, and a credential nobody reads is
+%% noise in the log of whoever runs the local engine.
+a_keyless_provider_is_called_without_an_authorization_header_test() ->
+    _ = with_local_endpoint(200, answer(<<"A post.">>, 42), "local-model"),
+    {ok, _} = mind_llm:reason(<<"charter">>, <<"prompt">>),
+    ?assertEqual(nomatch, binary:match(last_request(), <<"authorization">>)).
+
+providers() ->
+    [maps:get(provider, Pool) || Pool <- maps:get(pool, mind_llm:config())].
+
+resting_providers() ->
+    [maps:get(provider, Pool) || Pool <- maps:get(pool, mind_llm:config()),
+                                 maps:get(resting, Pool)].
+
+clear_breaker() ->
+    _ = catch ets:delete(mind_breaker),
+    ok.
 
 %%====================================================================
-%% The endpoint, on loopback
+%% The endpoints, on loopback
 %%====================================================================
+
+%% One endpoint, named the way W1b's deployment names it. `Extra' is whatever
+%% else the answer should carry, which for a 429 is the header that says how
+%% long the quota is gone for.
+with_endpoint(Status, Body) ->
+    with_endpoint(Status, Body, []).
+
+with_endpoint(Status, Body, Extra) ->
+    Port = listener({Status, Body, Extra}),
+    set_mind(mind_endpoint, url(Port)),
+    set_mind(mind_model, <<"test-model">>),
+    os:putenv("MCL_MIND_API_KEY", "test-key"),
+    os:unsetenv("MCL_MIND_PROVIDERS"),
+    os:unsetenv("MCL_MIND_LOCAL_URL"),
+    Port.
+
+%% Two of them, named as a pool, with the second as the keyless local floor: the
+%% shape a deployment uses to survive one brokered provider failing.
+with_pool(FirstStatus, FirstBody, SecondStatus, SecondBody) ->
+    FirstPort = listener({FirstStatus, FirstBody, []}),
+    SecondPort = listener({SecondStatus, SecondBody, []}),
+    set_mind(mind_endpoint, url(FirstPort)),
+    set_mind(mind_model, <<"test-model">>),
+    os:putenv("MCL_MIND_API_KEY", "test-key"),
+    os:putenv("MCL_MIND_PROVIDERS", "endpoint,local"),
+    os:putenv("MCL_MIND_LOCAL_URL", url(SecondPort)),
+    os:putenv("MCL_MIND_LOCAL_MODEL", "local-model").
+
+%% Only the floor, so the request that goes out is the one the floor makes.
+with_local_endpoint(Status, Body, Model) ->
+    Port = listener({Status, Body, []}),
+    os:putenv("MCL_MIND_PROVIDERS", "local"),
+    os:putenv("MCL_MIND_LOCAL_URL", url(Port)),
+    os:putenv("MCL_MIND_LOCAL_MODEL", Model),
+    os:unsetenv("MCL_MIND_LOCAL_API_KEY"),
+    os:unsetenv("MCL_MIND_FALLBACK_PROVIDERS"),
+    Port.
+
+set_mind(Key, Value) ->
+    _ = application:load(mcl_spartan),
+    application:set_env(mcl_spartan, Key, Value),
+    application:set_env(mcl_spartan, mind_timeout_ms, 5000),
+    application:set_env(mcl_spartan, mind_max_tokens, 64),
+    os:unsetenv("MCL_MIND_FALLBACK_PROVIDERS").
+
+url(Port) ->
+    "http://127.0.0.1:" ++ integer_to_list(Port) ++ "/v1/chat/completions".
 
 %% A listener on an ephemeral port that answers exactly one request with `Body',
 %% and keeps what it was asked so the test can read the call that was made. NOT
 %% linked: a test that makes no call leaves it waiting, and a link would take
 %% the test down when it gives up.
-with_endpoint(Status, Body) ->
+listener({Status, Body, Extra}) ->
     {ok, Listen} = gen_tcp:listen(0, [binary, {active, false}, {reuseaddr, true},
                                       {ip, {127, 0, 0, 1}}]),
     {ok, Port} = inet:port(Listen),
     _ = ensure_table(),
-    Server = spawn(fun() -> answer_once(Listen, Status, Body) end),
-    _ = application:load(mcl_spartan),
-    application:set_env(mcl_spartan, mind_endpoint,
-                        "http://127.0.0.1:" ++ integer_to_list(Port) ++ "/v1/chat/completions"),
-    application:set_env(mcl_spartan, mind_model, <<"test-model">>),
-    application:set_env(mcl_spartan, mind_api_key, <<"test-key">>),
-    application:set_env(mcl_spartan, mind_timeout_ms, 5000),
-    application:set_env(mcl_spartan, mind_max_tokens, 64),
-    #{port => Port, server => Server, listen => Listen}.
+    _ = spawn(fun() -> answer_once(Listen, Status, Body, Extra) end),
+    Port.
 
-answer_once(Listen, Status, Body) ->
-    answered(gen_tcp:accept(Listen, 5000), Listen, Status, Body).
+answer_once(Listen, Status, Body, Extra) ->
+    answered(gen_tcp:accept(Listen, 5000), Listen, Status, Body, Extra).
 
-answered({ok, Socket}, Listen, Status, Body) ->
+answered({ok, Socket}, Listen, Status, Body, Extra) ->
     ets:insert(?TABLE, {last, read_request(Socket, <<>>)}),
-    _ = gen_tcp:send(Socket, response(Status, Body)),
+    _ = gen_tcp:send(Socket, response(Status, Body, Extra)),
     gen_tcp:close(Socket),
     gen_tcp:close(Listen);
-answered({error, _NoCall}, Listen, _Status, _Body) ->
+answered({error, _NoCall}, Listen, _Status, _Body, _Extra) ->
     gen_tcp:close(Listen).
 
 %% Headers and the whole declared body, or it is not a complete request.
@@ -178,9 +302,10 @@ ensure_table() ->
         _Existing -> ?TABLE
     end.
 
-response(Status, Body) ->
+response(Status, Body, Extra) ->
     ["HTTP/1.1 ", integer_to_list(Status), " ", reason(Status), "\r\n",
      "content-type: application/json\r\n",
+     Extra,
      "content-length: ", integer_to_list(byte_size(Body)), "\r\n",
      "connection: close\r\n\r\n", Body].
 
