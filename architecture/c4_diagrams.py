@@ -191,7 +191,7 @@ def containers():
     s.edge("M620 300V355")                     # identity key
 
     s.element("b-sys", 280, 100, 450, 200, "mcl-spartan service",
-              "[Container: OCI image, OTP 28.4.3 release, mcl_om 0.39]",
+              "[Container: OCI image, OTP 28.4.3 release, mcl_om 1.0]",
               ["One supervised mind (spartan_mind) and one subscriber on mcl-news's fact",
                "topic (subscriptions/0). No procedure is offered and no store is opened:",
                "from mcl-om come node identity, the pinned station dial, the realm claim",
