@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0 (2026-10-17)
+
+- **Wire 1.0: on macula 15.6 and mcl_om 1.0** (macula-fleet#27). macula 15 neither reads a 14 node's frames nor completes a handshake with it, so the fleet moves across in one flag day rather than node by node. mcl_om 1.0 is this service on the new wire: no function it calls moved or changed arity. `mcl_om ~> 0.x` takes any 0.x, so a 0.43 on macula 15 would have rolled the live 0.10.3 fleet on its next build; it names 1.0, which is outside that range.
+
 ## 0.3.1 (2026-10-15)
 
 - **Rebuilt on mcl_om 0.42** (mcl-om#26): advertisement renewals move to a 70 s interval under a 280 s TTL (from 30 s / 120 s), so a station sends far fewer renewal frames; the health windows derive from the interval. Carries macula 14.11.0 (mcl_om 0.42's floor).
