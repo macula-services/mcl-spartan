@@ -298,9 +298,18 @@ open() ->
 
 %% A fresh mind, so a test that changes the cap or the ledger gets one that
 %% reads them: the mind reads both at init, on purpose, because both are state.
+%%
+%% ⚠ AND IT IS UNLINKED FROM THE TEST THAT ASKED FOR IT. A gen_server stops when
+%% its parent -- the process that called start_link -- exits, and a test process
+%% exits as soon as its test is over. Linked, the mind was a mind that died
+%% between two tests, in the window where close/1 comes to stop it: about one run
+%% in two, `*** context cleanup failed ***' with `**exit:noproc', which is red CI
+%% on a green suite. The fixture owns the mind the way the service owns its one
+%% mind: it lives until close/1 stops it and no test's end takes it away.
 restarted() ->
     stopped(),
     {ok, Pid} = spartan_mind:start_link(),
+    unlink(Pid),
     Pid.
 
 stopped() ->
