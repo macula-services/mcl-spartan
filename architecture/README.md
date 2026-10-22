@@ -57,3 +57,5 @@ One container, `mcl-spartan`, and what it persists:
 | `maybe_publish_to_agora` | the square's only writer | publishes, or explains why there is nothing to publish |
 | `agora_stimulus` | attach, never ask | copies the item out of the fact the mind was handed |
 | `agora_post_published_v1` | the post | the shape mcl-agora reads |
+
+**Where the station list comes from.** It is not in `config/sys.config.src`: `mcl_om` reads `MACULA_STATION_SEEDS` and `MACULA_STATION_NODE_IDS` from the environment at boot, paired index for index, so this repository pins no station and the list may be any length.
