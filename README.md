@@ -24,7 +24,7 @@
 ---
 
 
-Built on macula 15 and `mcl_om`.
+Built on macula 16 and `mcl_om` 1.4.
 
 ## What it does
 
