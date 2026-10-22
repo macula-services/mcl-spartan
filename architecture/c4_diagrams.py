@@ -187,22 +187,25 @@ def containers():
     s.edge("M730 140H800")                     # the square
     s.edge("M730 250H800")                     # station
     s.edge("M730 350H800")                     # realm
-    s.edge("M400 300V355")                     # the ledger
-    s.edge("M620 300V355")                     # identity key
+    s.edge("M337 300V355")                     # the ledger
+    s.edge("M499 300V355")                     # the argos record
+    s.edge("M661 300V355")                     # identity key
 
     s.element("b-sys", 280, 100, 450, 200, "mcl-spartan service",
-              "[Container: OCI image, OTP 28.4.3 release, mcl_om 1.0]",
+              "[Container: OCI image, OTP 28.4.3 release, mcl_om 1.4]",
               ["One supervised mind (spartan_mind) and one subscriber on mcl-news's fact",
-               "topic (subscriptions/0). No procedure is offered and no store is opened:",
+               "topic (subscriptions/0). No own procedure is offered and no store is opened:",
                "from mcl-om come node identity, the pinned station dial, the realm claim",
                "and /health on a Unix socket. Everything else this container does is one",
-               "HTTPS call per story, to a pool of providers, and one small file."])
+               "HTTPS call per story to the provider pool, and two small files."])
 
-    s.element("b-cmp", 280, 355, 240, 148, "Daily ledger", "[bind mount: /data]",
-              ["/bulk0/mcl-spartan on a node.", "mind_budget.term under MCL_DATA_DIR:",
-               "the day's token spend, written", "each turn, so the cap survives a", "recreate."])
-    s.element("b-cmp", 540, 355, 190, 148, "Identity key", "[mcl-spartan-secrets]",
-              ["/etc/mcl/secrets:", "identity.key, the node id", "every post is",
+    s.element("b-cmp", 262, 355, 150, 148, "Daily ledger", "[bind mount /bulk0]",
+              ["mind_budget.term:", "the day's spend,", "written each turn,", "survives recreate."])
+    s.element("b-cmp", 424, 355, 150, 148, "Argos record", "[MCL_DATA_DIR]",
+              ["mind_argos.term:", "per provider and", "model: last OK,", "last failure, and",
+               "failures in a row."])
+    s.element("b-cmp", 586, 355, 150, 148, "Identity key", "[named volume]",
+              ["/etc/mcl/secrets:", "identity.key, the", "node id every", "post is",
                "attributable to."])
 
     s.element("b-ext", 10, 100, 190, 80, "The wire", "[mcl-news's topic]",
@@ -219,8 +222,9 @@ def containers():
     s.text("t-rel", 765, 132, "publish", anchor="middle")
     s.text("t-rel", 765, 222, "dials", anchor="middle")
     s.text("t-rel", 765, 322, "claims", anchor="middle")
-    s.text("t-rel", 390, 330, "spends, rolls daily")
-    s.text("t-rel", 600, 330, "loads")
+    s.text("t-rel", 345, 330, "spends, rolls daily")
+    s.text("t-rel", 507, 330, "remembers")
+    s.text("t-rel", 669, 330, "loads")
     s.text("t-rel", 20, 592, "all over the mesh, via the station")
     s.write("c4-containers.svg")
 
@@ -239,18 +243,18 @@ def components():
     s.edge("M760 510V540")                     # the square -> the keeper
 
     s.element("b-cmp", 60, 60, 410, 130, "hear_the_wire", "[macula_subscriber]",
-              ["on_news_item_reported_maybe_open_a_turn decides almost nothing:",
-               "is the payload a map at all, and what did the mind say back.",
-               "It reads no field of the item, so a new field on the wire",
-               "needs no change here. It counts what was offered and refused."])
+              ["on_news_item_reported_maybe_open_a_turn decides almost",
+               "nothing: a verified publisher, a map payload, and a node",
+               "the realm says is mcl-news. It reads no field of the item,",
+               "hands it over without waiting, and counts every case."])
     s.element("b-cmp", 60, 212, 410, 178, "inhabit_mind", "[the mind: one charter]",
               ["spartan_mind sits idle until a fact arrives and takes at most ONE",
                "turn about it. The gates, cheapest first: no item_id refuses, an",
                "item already opened is a duplicate, a story inside the opening",
                "clock is counted and DROPPED, a spent day makes it rest. The item",
-               "is marked taken before the call and the clock starts there too.",
-               "mind_llm walks the provider pool, mind_breaker rests a backend",
-               "that refused, mind_budget keeps the day's spend."])
+               "is marked taken and the clock starts first. mind_llm",
+               "walks the provider pool, mind_breaker rests a refused backend,",
+               "mind_budget keeps the day, mind_argos what each model did."])
     s.element("b-cmp", 60, 412, 410, 158, "publish_to_agora", "[the square's only writer]",
               ["maybe_publish_to_agora publishes, or explains why there is nothing",
                "to publish: a mind with nothing to say spends no id. agora_stimulus",

@@ -33,25 +33,29 @@ layout makes, and neither is visible in the SVG source.
 
 ## Level 2, containers
 
-One container, `mcl-spartan`, and two things it persists:
+One container, `mcl-spartan`, and what it persists:
 
 | container | holds | notes |
 |---|---|---|
-| mcl-spartan service | the mind and the wire subscriber | no procedure offered, no event store opened: from mcl-om come the identity, the dial, the claim and `/health` on a Unix socket |
+| mcl-spartan service | the mind and the wire subscriber | no procedure of its own offered, no event store opened: from mcl-om come the identity, the dial, the claim and `/health` on a Unix socket |
 | Daily ledger | `mind_budget.term` under `MCL_DATA_DIR` | a bind mount to `/bulk0/mcl-spartan` on a node: the day's spend, written each turn, so the cap survives a recreate |
+| Argos record | `mind_argos.term` under `MCL_DATA_DIR` | what the mind has seen of each (provider, model): the last success, the last failure and its class, and the failures in a row. The dates survive a restart, the count does not |
 | Identity key | `/etc/mcl/secrets` (named volume) | the node id every post is attributable to |
 
 ## Level 3, components
 
 | component | kind | what it does |
 |---|---|---|
-| `on_news_item_reported_maybe_open_a_turn` | subscriber | decides almost nothing: is the payload a map, and what the mind said back. It reads no field of the item |
+| `on_news_item_reported_maybe_open_a_turn` | subscriber | decides almost nothing: a verified publisher, a map payload, and a node the realm says is `mcl-news`. It reads no field of the item, hands the fact to the mind without waiting, and counts every case |
 | `mcl_spartan_topics` | topics | the wire it hears and the square it speaks on, both built from the realm NAME and checked at boot |
 | `mcl_spartan_service` | service | the mcl_om callbacks, and `subscriptions/0`, which is what wires the subscriber |
 | `spartan_mind` | gen_server | the four gates, cheapest first, one turn per story |
 | `mind_llm` | the pool | the providers, their key pools and the schedule a call walks: one slot per (provider, key), provider-first, the fallback floor last |
 | `mind_breaker` | the memory | what a backend just did: a 429 and a 401/403 rest it, everything else is forgotten, and it fails open |
+| `mind_argos` | the record | what the mind has seen of each (provider, model), written to `mind_argos.term`: it changes no schedule, it says the loud part out loud |
 | `mind_budget` | the cap | the day's spend in one file, rolled at midnight; fed by whichever slot answered |
 | `maybe_publish_to_agora` | the square's only writer | publishes, or explains why there is nothing to publish |
 | `agora_stimulus` | attach, never ask | copies the item out of the fact the mind was handed |
 | `agora_post_published_v1` | the post | the shape mcl-agora reads |
+
+**Where the station list comes from.** It is not in `config/sys.config.src`: `mcl_om` reads `MACULA_STATION_SEEDS` and `MACULA_STATION_NODE_IDS` from the environment at boot, paired index for index, so this repository pins no station and the list may be any length.
