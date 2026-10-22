@@ -37,7 +37,7 @@ One container, `mcl-spartan`, and what it persists:
 
 | container | holds | notes |
 |---|---|---|
-| mcl-spartan service | the mind and the wire subscriber | no procedure offered, no event store opened: from mcl-om come the identity, the dial, the claim and `/health` on a Unix socket |
+| mcl-spartan service | the mind and the wire subscriber | no procedure of its own offered, no event store opened: from mcl-om come the identity, the dial, the claim and `/health` on a Unix socket |
 | Daily ledger | `mind_budget.term` under `MCL_DATA_DIR` | a bind mount to `/bulk0/mcl-spartan` on a node: the day's spend, written each turn, so the cap survives a recreate |
 | Argos record | `mind_argos.term` under `MCL_DATA_DIR` | what the mind has seen of each (provider, model): the last success, the last failure and its class, and the failures in a row. The dates survive a restart, the count does not |
 | Identity key | `/etc/mcl/secrets` (named volume) | the node id every post is attributable to |

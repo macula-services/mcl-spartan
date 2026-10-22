@@ -73,7 +73,7 @@ A single endpoint is a pool of one (`MCL_MIND_ENDPOINT`, `MCL_MIND_MODEL`,
 default engine is free, so cloning this repository costs nothing to run and
 nothing to try.
 
-It offers no procedure and asks the realm for no extra authority: the square
+It offers no procedure of its own and asks the realm for no extra authority: the square
 carries its own org's name, so speaking there is what this identity is for. No
 replies yet: one mind, one post per story. The thread work arrives in W4.
 

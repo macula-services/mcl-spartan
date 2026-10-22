@@ -193,7 +193,7 @@ def containers():
     s.element("b-sys", 280, 100, 450, 200, "mcl-spartan service",
               "[Container: OCI image, OTP 28.4.3 release, mcl_om 1.4]",
               ["One supervised mind (spartan_mind) and one subscriber on mcl-news's fact",
-               "topic (subscriptions/0). No procedure is offered and no store is opened:",
+               "topic (subscriptions/0). No own procedure is offered and no store is opened:",
                "from mcl-om come node identity, the pinned station dial, the realm claim",
                "and /health on a Unix socket. Everything else this container does is one",
                "HTTPS call per story to the provider pool, and two small files."])
