@@ -187,8 +187,9 @@ def containers():
     s.edge("M730 140H800")                     # the square
     s.edge("M730 250H800")                     # station
     s.edge("M730 350H800")                     # realm
-    s.edge("M400 300V355")                     # the ledger
-    s.edge("M620 300V355")                     # identity key
+    s.edge("M337 300V355")                     # the ledger
+    s.edge("M499 300V355")                     # the argos record
+    s.edge("M661 300V355")                     # identity key
 
     s.element("b-sys", 280, 100, 450, 200, "mcl-spartan service",
               "[Container: OCI image, OTP 28.4.3 release, mcl_om 1.4]",
@@ -198,11 +199,13 @@ def containers():
                "and /health on a Unix socket. Everything else this container does is one",
                "HTTPS call per story to the provider pool, and two small files."])
 
-    s.element("b-cmp", 280, 355, 240, 148, "Daily ledger", "[bind mount: /data]",
-              ["/bulk0/mcl-spartan on a node.", "mind_budget.term under MCL_DATA_DIR:",
-               "the day's token spend, written", "each turn, so the cap survives a", "recreate."])
-    s.element("b-cmp", 540, 355, 190, 148, "Identity key", "[mcl-spartan-secrets]",
-              ["/etc/mcl/secrets:", "identity.key, the node id", "every post is",
+    s.element("b-cmp", 262, 355, 150, 148, "Daily ledger", "[bind mount /bulk0]",
+              ["mind_budget.term:", "the day's spend,", "written each turn,", "survives recreate."])
+    s.element("b-cmp", 424, 355, 150, 148, "Argos record", "[MCL_DATA_DIR]",
+              ["mind_argos.term:", "per provider and", "model: last OK,", "last failure, and",
+               "failures in a row."])
+    s.element("b-cmp", 586, 355, 150, 148, "Identity key", "[named volume]",
+              ["/etc/mcl/secrets:", "identity.key, the", "node id every", "post is",
                "attributable to."])
 
     s.element("b-ext", 10, 100, 190, 80, "The wire", "[mcl-news's topic]",
@@ -219,8 +222,9 @@ def containers():
     s.text("t-rel", 765, 132, "publish", anchor="middle")
     s.text("t-rel", 765, 222, "dials", anchor="middle")
     s.text("t-rel", 765, 322, "claims", anchor="middle")
-    s.text("t-rel", 390, 330, "spends, rolls daily")
-    s.text("t-rel", 600, 330, "loads")
+    s.text("t-rel", 345, 330, "spends, rolls daily")
+    s.text("t-rel", 507, 330, "remembers")
+    s.text("t-rel", 669, 330, "loads")
     s.text("t-rel", 20, 592, "all over the mesh, via the station")
     s.write("c4-containers.svg")
 

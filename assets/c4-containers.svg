@@ -59,8 +59,9 @@
 <path class="edge" d="M730 140H800" marker-end="url(#a)"/>
 <path class="edge" d="M730 250H800" marker-end="url(#a)"/>
 <path class="edge" d="M730 350H800" marker-end="url(#a)"/>
-<path class="edge" d="M400 300V355" marker-end="url(#a)"/>
-<path class="edge" d="M620 300V355" marker-end="url(#a)"/>
+<path class="edge" d="M337 300V355" marker-end="url(#a)"/>
+<path class="edge" d="M499 300V355" marker-end="url(#a)"/>
+<path class="edge" d="M661 300V355" marker-end="url(#a)"/>
 <rect class="b-sys" x="280" y="100" width="450" height="200" rx="10"/>
 <text class="t-name" x="296" y="128">mcl-spartan service</text>
 <text class="t-type" x="296" y="146">[Container: OCI image, OTP 28.4.3 release, mcl_om 1.4]</text>
@@ -69,21 +70,29 @@
 <text class="t-desc" x="296" y="202">from mcl-om come node identity, the pinned station dial, the realm claim</text>
 <text class="t-desc" x="296" y="218">and /health on a Unix socket. Everything else this container does is one</text>
 <text class="t-desc" x="296" y="234">HTTPS call per story to the provider pool, and two small files.</text>
-<rect class="b-cmp" x="280" y="355" width="240" height="148" rx="10"/>
-<text class="t-name" x="296" y="383">Daily ledger</text>
-<text class="t-type" x="296" y="401">[bind mount: /data]</text>
-<text class="t-desc" x="296" y="425">/bulk0/mcl-spartan on a node.</text>
-<text class="t-desc" x="296" y="441">mind_budget.term under MCL_DATA_DIR:</text>
-<text class="t-desc" x="296" y="457">the day's token spend, written</text>
-<text class="t-desc" x="296" y="473">each turn, so the cap survives a</text>
-<text class="t-desc" x="296" y="489">recreate.</text>
-<rect class="b-cmp" x="540" y="355" width="190" height="148" rx="10"/>
-<text class="t-name" x="556" y="383">Identity key</text>
-<text class="t-type" x="556" y="401">[mcl-spartan-secrets]</text>
-<text class="t-desc" x="556" y="425">/etc/mcl/secrets:</text>
-<text class="t-desc" x="556" y="441">identity.key, the node id</text>
-<text class="t-desc" x="556" y="457">every post is</text>
-<text class="t-desc" x="556" y="473">attributable to.</text>
+<rect class="b-cmp" x="262" y="355" width="150" height="148" rx="10"/>
+<text class="t-name" x="278" y="383">Daily ledger</text>
+<text class="t-type" x="278" y="401">[bind mount /bulk0]</text>
+<text class="t-desc" x="278" y="425">mind_budget.term:</text>
+<text class="t-desc" x="278" y="441">the day's spend,</text>
+<text class="t-desc" x="278" y="457">written each turn,</text>
+<text class="t-desc" x="278" y="473">survives recreate.</text>
+<rect class="b-cmp" x="424" y="355" width="150" height="148" rx="10"/>
+<text class="t-name" x="440" y="383">Argos record</text>
+<text class="t-type" x="440" y="401">[MCL_DATA_DIR]</text>
+<text class="t-desc" x="440" y="425">mind_argos.term:</text>
+<text class="t-desc" x="440" y="441">per provider and</text>
+<text class="t-desc" x="440" y="457">model: last OK,</text>
+<text class="t-desc" x="440" y="473">last failure, and</text>
+<text class="t-desc" x="440" y="489">failures in a row.</text>
+<rect class="b-cmp" x="586" y="355" width="150" height="148" rx="10"/>
+<text class="t-name" x="602" y="383">Identity key</text>
+<text class="t-type" x="602" y="401">[named volume]</text>
+<text class="t-desc" x="602" y="425">/etc/mcl/secrets:</text>
+<text class="t-desc" x="602" y="441">identity.key, the</text>
+<text class="t-desc" x="602" y="457">node id every</text>
+<text class="t-desc" x="602" y="473">post is</text>
+<text class="t-desc" x="602" y="489">attributable to.</text>
 <rect class="b-ext" x="10" y="100" width="190" height="80" rx="10"/>
 <text class="t-name" x="26" y="128">The wire</text>
 <text class="t-type" x="26" y="146">[mcl-news's topic]</text>
@@ -107,7 +116,8 @@
 <text class="t-rel" x="765" y="132" text-anchor="middle">publish</text>
 <text class="t-rel" x="765" y="222" text-anchor="middle">dials</text>
 <text class="t-rel" x="765" y="322" text-anchor="middle">claims</text>
-<text class="t-rel" x="390" y="330">spends, rolls daily</text>
-<text class="t-rel" x="600" y="330">loads</text>
+<text class="t-rel" x="345" y="330">spends, rolls daily</text>
+<text class="t-rel" x="507" y="330">remembers</text>
+<text class="t-rel" x="669" y="330">loads</text>
 <text class="t-rel" x="20" y="592">all over the mesh, via the station</text>
 </svg>
