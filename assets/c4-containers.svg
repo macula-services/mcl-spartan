@@ -63,12 +63,12 @@
 <path class="edge" d="M620 300V355" marker-end="url(#a)"/>
 <rect class="b-sys" x="280" y="100" width="450" height="200" rx="10"/>
 <text class="t-name" x="296" y="128">mcl-spartan service</text>
-<text class="t-type" x="296" y="146">[Container: OCI image, OTP 28.4.3 release, mcl_om 1.0]</text>
+<text class="t-type" x="296" y="146">[Container: OCI image, OTP 28.4.3 release, mcl_om 1.4]</text>
 <text class="t-desc" x="296" y="170">One supervised mind (spartan_mind) and one subscriber on mcl-news's fact</text>
 <text class="t-desc" x="296" y="186">topic (subscriptions/0). No procedure is offered and no store is opened:</text>
 <text class="t-desc" x="296" y="202">from mcl-om come node identity, the pinned station dial, the realm claim</text>
 <text class="t-desc" x="296" y="218">and /health on a Unix socket. Everything else this container does is one</text>
-<text class="t-desc" x="296" y="234">HTTPS call per story, to a pool of providers, and one small file.</text>
+<text class="t-desc" x="296" y="234">HTTPS call per story to the provider pool, and two small files.</text>
 <rect class="b-cmp" x="280" y="355" width="240" height="148" rx="10"/>
 <text class="t-name" x="296" y="383">Daily ledger</text>
 <text class="t-type" x="296" y="401">[bind mount: /data]</text>

@@ -59,10 +59,10 @@
 <rect class="b-cmp" x="60" y="60" width="410" height="130" rx="10"/>
 <text class="t-name" x="76" y="88">hear_the_wire</text>
 <text class="t-type" x="76" y="106">[macula_subscriber]</text>
-<text class="t-desc" x="76" y="130">on_news_item_reported_maybe_open_a_turn decides almost nothing:</text>
-<text class="t-desc" x="76" y="146">is the payload a map at all, and what did the mind say back.</text>
-<text class="t-desc" x="76" y="162">It reads no field of the item, so a new field on the wire</text>
-<text class="t-desc" x="76" y="178">needs no change here. It counts what was offered and refused.</text>
+<text class="t-desc" x="76" y="130">on_news_item_reported_maybe_open_a_turn decides almost</text>
+<text class="t-desc" x="76" y="146">nothing: a verified publisher, a map payload, and a node</text>
+<text class="t-desc" x="76" y="162">the realm says is mcl-news. It reads no field of the item,</text>
+<text class="t-desc" x="76" y="178">hands it over without waiting, and counts every case.</text>
 <rect class="b-cmp" x="60" y="212" width="410" height="178" rx="10"/>
 <text class="t-name" x="76" y="240">inhabit_mind</text>
 <text class="t-type" x="76" y="258">[the mind: one charter]</text>
@@ -70,9 +70,9 @@
 <text class="t-desc" x="76" y="298">turn about it. The gates, cheapest first: no item_id refuses, an</text>
 <text class="t-desc" x="76" y="314">item already opened is a duplicate, a story inside the opening</text>
 <text class="t-desc" x="76" y="330">clock is counted and DROPPED, a spent day makes it rest. The item</text>
-<text class="t-desc" x="76" y="346">is marked taken before the call and the clock starts there too.</text>
-<text class="t-desc" x="76" y="362">mind_llm walks the provider pool, mind_breaker rests a backend</text>
-<text class="t-desc" x="76" y="378">that refused, mind_budget keeps the day's spend.</text>
+<text class="t-desc" x="76" y="346">is marked taken and the clock starts first. mind_llm</text>
+<text class="t-desc" x="76" y="362">walks the provider pool, mind_breaker rests a refused backend,</text>
+<text class="t-desc" x="76" y="378">mind_budget keeps the day, mind_argos what each model did.</text>
 <rect class="b-cmp" x="60" y="412" width="410" height="158" rx="10"/>
 <text class="t-name" x="76" y="440">publish_to_agora</text>
 <text class="t-type" x="76" y="458">[the square's only writer]</text>
