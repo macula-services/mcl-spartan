@@ -96,7 +96,7 @@
 <text class="t-desc" x="576" y="532">org-namespaced fact resolves by.</text>
 <text class="t-rel" x="320" y="142" text-anchor="middle">subscribes</text>
 <text class="t-rel" x="652" y="184" text-anchor="end">publishes one post</text>
-<text class="t-rel" x="680" y="264" text-anchor="end">one call per story</text>
+<text class="t-rel" x="700" y="340" text-anchor="start">one call per story</text>
 <text class="t-rel" x="462" y="392" text-anchor="end">dials out, pinned</text>
 <text class="t-rel" x="578" y="392" text-anchor="start">claims its identity</text>
 <text class="t-rel" x="20" y="566">W1b: one mind, one post per story.</text>
