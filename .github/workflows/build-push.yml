@@ -1,17 +1,18 @@
 # Build the OCI image for mcl-spartan and push to the registry.
 #
-# TWO CHANNELS, AND ONLY A RELEASE MOVES :latest.
+# TWO CHANNELS, AND ONLY A RELEASE IS DEPLOYED.
 #
-#   push of v*   : publishes :<semver>, then :latest once attest signed it <- the dev fleet's deploy channel
+#   push of v*   : publishes :<semver>, then :latest once attest signed it
 #   push to main : publishes :main and :<sha>       <- the tip, for trying; nothing follows it
 #
-# The dev fleet (macula-fleet) runs :latest: each box's reconciler pulls it, verifies the
-# digest it resolved to (signature, SBOM, provenance) and runs that digest. So a green v* tag
-# IS the deploy, with no commit to the fleet, and a push to main deploys nothing. The semver
-# tags stay published, so a bad release can be pinned back to a known one.
+# macula-fleet runs a signed release pinned by digest: each box reconciles the
+# <semver>@sha256:<digest> its commit names, checks the signature, SBOM and
+# provenance, and runs that digest, and CI commits the pin bump after a green v*
+# tag. So a v* tag IS the deploy, a push to main deploys nothing, and the semver
+# tags stay published so a bad release can be pinned back to a known one.
 #
 # NO PATH FILTER, ON PURPOSE. A docs-only push should not rebuild the image and
-# restart every box, but `paths-ignore' cannot be trusted with that: on the push
+# roll every container, but `paths-ignore' cannot be trusted with that: on the push
 # that CREATES a branch GitHub evaluates it on the head commit alone, so a first
 # push ending in a README edit silently built no image. scripts/is_image_push.sh
 # decides from the pushed range instead, and builds whenever it cannot tell.
@@ -31,7 +32,7 @@ on:
   workflow_dispatch:
 
 # ONE IMAGE BUILD IN FLIGHT PER REF. Every push to main builds and pushes
-# :main and :<sha>, and a v* tag builds and promotes :latest; without this,
+# :main and :<sha>, and a v* tag builds and promotes the release; without this,
 # three quick commits run three builds that finish in whatever order the
 # runners please, and the ref ends up pointing at whichever finished LAST,
 # not whichever was pushed last -- a box following that tag then runs an
@@ -126,9 +127,9 @@ jobs:
       image: ghcr.io/macula-services/mcl-spartan
       digest: ${{ needs.build-and-push.outputs.digest }}
 
-  # :latest is the dev fleet's deploy channel, so it moves LAST: only on a v* tag, and only once
-  # attest has signed and attested this digest. A box that pulls :latest in the window between
-  # push and signature would otherwise refuse the release (and remember that for an hour).
+  # The moving tag moves LAST: only on a v* tag, and only once attest has signed and attested
+  # this digest. A box that took it in the window between push and signature would otherwise
+  # refuse the release (and remember that for an hour).
   promote-latest:
     needs: [build-and-push, attest]
     if: startsWith(github.ref, 'refs/tags/v') && needs.build-and-push.outputs.digest != ''

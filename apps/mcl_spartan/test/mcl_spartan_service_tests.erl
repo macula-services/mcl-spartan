@@ -61,8 +61,8 @@ health_reports_whether_the_mind_runs_test() ->
         _Pid      -> ?assertEqual(ok, ?SERVICE:health())
     end.
 
-%% A speaker offers no procedure: it publishes to the square, and the keeper
-%% subscribes. An empty list is the honest answer, and adding a capability
+%% A speaker offers no procedure of its own: it publishes to the square, and
+%% the keeper subscribes. An empty list is the honest answer, and adding a capability
 %% breaks this test so someone writes down what this service can now be called
 %% for.
 announces_no_capability_test() ->
