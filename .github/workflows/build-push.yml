@@ -11,8 +11,7 @@
 # tag. So a v* tag IS the deploy, a push to main deploys nothing, and the semver
 # tags stay published so a bad release can be pinned back to a known one.
 #
-# NO PATH FILTER, ON PURPOSE. A docs-only push should not rebuild the image and
-# roll every container, but `paths-ignore' cannot be trusted with that: on the push
+# NO PATH FILTER, ON PURPOSE. A docs-only push should not rebuild the image, but `paths-ignore' cannot be trusted with that: on the push
 # that CREATES a branch GitHub evaluates it on the head commit alone, so a first
 # push ending in a README edit silently built no image. scripts/is_image_push.sh
 # decides from the pushed range instead, and builds whenever it cannot tell.

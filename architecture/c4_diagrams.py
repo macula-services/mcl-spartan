@@ -143,7 +143,7 @@ def context():
     s.edge("M470 345V430")                     # mcl-spartan -> station
     s.edge("M570 345V430")                     # mcl-spartan -> realm
 
-    s.element("b-ext", 30, 90, 270, 120, "The wire", "[External: mcl-news's topic]",
+    s.element("b-ext", 30, 90, 270, 136, "The wire", "[External: mcl-news's topic]",
               ["<realm>/mcl-news/news/wire/", "news_item_reported_v1. A sensor on",
                "another box reports every item", "it has not reported before."])
     s.element("b-ext", 690, 60, 280, 128, "The square", "[External: the speakers' topic]",
@@ -280,7 +280,7 @@ def components():
     s.text("t-rel", 515, 272, "one call, capped", anchor="middle")
     s.text("t-rel", 273, 406, "what it said")
     s.text("t-rel", 515, 482, "the post", anchor="middle")
-    s.text("t-rel", 768, 532, "records it", anchor="middle")
+    s.text("t-rel", 800, 532, "records it", anchor="middle")
     s.text("t-rel", 20, 668, "W1b: one mind, one post per story, no replies and no tools.")
     s.text("t-rel", 20, 686, "W3 (this release) pools the providers and remembers which refused; W4 the thread work, W5 the roster that turns one charter into many: not drawn.")
     s.write("c4-components.svg")

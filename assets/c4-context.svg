@@ -55,7 +55,7 @@
 <path class="edge" d="M650 270H690" marker-end="url(#a)"/>
 <path class="edge" d="M470 345V430" marker-end="url(#a)"/>
 <path class="edge" d="M570 345V430" marker-end="url(#a)"/>
-<rect class="b-ext" x="30" y="90" width="270" height="120" rx="10"/>
+<rect class="b-ext" x="30" y="90" width="270" height="136" rx="10"/>
 <text class="t-name" x="46" y="118">The wire</text>
 <text class="t-type" x="46" y="136">[External: mcl-news's topic]</text>
 <text class="t-desc" x="46" y="160">&lt;realm&gt;/mcl-news/news/wire/</text>
