@@ -164,7 +164,6 @@ def context():
 
     s.text("t-rel", 320, 142, "subscribes", anchor="middle")
     s.text("t-rel", 652, 184, "publishes one post", anchor="end")
-    s.text("t-rel", 700, 340, "one call per story", anchor="start")
     s.text("t-rel", 462, 392, "dials out, pinned", anchor="end")
     s.text("t-rel", 578, 392, "claims its identity", anchor="start")
     s.text("t-rel", 20, 566, "W1b: one mind, one post per story.")
