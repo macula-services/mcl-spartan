@@ -4,8 +4,9 @@
 %%% a service that forgets one dies with `undef' where nobody is watching. The
 %%% `-behaviour' attribute is what turns that into a compile error instead.
 %%%
-%%% A SPEAKER, NOT A SERVER. It offers no procedure, so it advertises no
-%%% capability and, like mcl-news, asks the realm for no extra authority. It
+%%% A SPEAKER, NOT A SERVER. It offers no procedure of its own, so beyond the
+%%% open `info` and `get_limits` mcl_om advertises it advertises none, and, like
+%%% mcl-news, asks the realm for no extra authority. It
 %%% subscribes to the wire and it publishes to the square, and both are things
 %%% its own verified identity is entitled to do without anybody's grant: the
 %%% square carries this org's name, and a fact on it is attributable to whoever
@@ -44,7 +45,7 @@ stop(_State) -> ok.
 %% and until it lands the pool is read from the box, not from the endpoint.
 health() -> spartan_mind:health().
 
-%% A speaker offers no procedure: it publishes a fact, and the keeper subscribes.
+%% A speaker offers no procedure of its own: it publishes a fact, and the keeper subscribes.
 capabilities() -> [].
 
 %% THE AUTHORITY THIS SERVICE ASKS THE REALM FOR, and deliberately nothing more:

@@ -55,7 +55,7 @@
 <path class="edge" d="M650 270H690" marker-end="url(#a)"/>
 <path class="edge" d="M470 345V430" marker-end="url(#a)"/>
 <path class="edge" d="M570 345V430" marker-end="url(#a)"/>
-<rect class="b-ext" x="30" y="90" width="270" height="120" rx="10"/>
+<rect class="b-ext" x="30" y="90" width="270" height="136" rx="10"/>
 <text class="t-name" x="46" y="118">The wire</text>
 <text class="t-type" x="46" y="136">[External: mcl-news's topic]</text>
 <text class="t-desc" x="46" y="160">&lt;realm&gt;/mcl-news/news/wire/</text>
@@ -96,7 +96,6 @@
 <text class="t-desc" x="576" y="532">org-namespaced fact resolves by.</text>
 <text class="t-rel" x="320" y="142" text-anchor="middle">subscribes</text>
 <text class="t-rel" x="652" y="184" text-anchor="end">publishes one post</text>
-<text class="t-rel" x="680" y="264" text-anchor="end">one call per story</text>
 <text class="t-rel" x="462" y="392" text-anchor="end">dials out, pinned</text>
 <text class="t-rel" x="578" y="392" text-anchor="start">claims its identity</text>
 <text class="t-rel" x="20" y="566">W1b: one mind, one post per story.</text>

@@ -106,7 +106,7 @@
 <text class="t-rel" x="515" y="272" text-anchor="middle">one call, capped</text>
 <text class="t-rel" x="273" y="406">what it said</text>
 <text class="t-rel" x="515" y="482" text-anchor="middle">the post</text>
-<text class="t-rel" x="768" y="532" text-anchor="middle">records it</text>
+<text class="t-rel" x="800" y="532" text-anchor="middle">records it</text>
 <text class="t-rel" x="20" y="668">W1b: one mind, one post per story, no replies and no tools.</text>
 <text class="t-rel" x="20" y="686">W3 (this release) pools the providers and remembers which refused; W4 the thread work, W5 the roster that turns one charter into many: not drawn.</text>
 </svg>
