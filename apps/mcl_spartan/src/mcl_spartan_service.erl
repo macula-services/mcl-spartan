@@ -20,7 +20,7 @@
 
 info() ->
     #{name => <<"mcl-spartan">>,
-      version => <<"0.4.0">>,
+      version => <<"0.5.0">>,
       description => <<"The Spartan Mind: hears the real wire, reasons once about one story, and posts what it made of it to the square">>}.
 
 %% The realm name the topics carry is checked against the realm the pool
@@ -62,9 +62,18 @@ identity_spec() ->
 %% @doc The wire, wired by mcl_om:boot/1 into a supervised subscriber before
 %% start/1 runs. The handler decides whether the fact is worth a turn; the mind
 %% decides what the turn says.
--spec subscriptions() -> [{binary(), module(), term()}].
+%% Who may deliver: `members' -- any publisher the realm admitted, which is
+%% what mcl-news, the publisher of the news wire, is. macula 18 has no default
+%% (macula#147) and mcl_om refuses a declaration that names none, so the
+%% decision is written here. Not `{org, _}`, because nothing in this mesh
+%% presents an org key yet, and not `{open, _}', which would let a publisher
+%% from outside the realm put words in the mind's mouth.
+-spec subscriptions() -> [mcl_om_service:subscription()].
 subscriptions() ->
-    [{Topic, on_news_item_reported_maybe_open_a_turn, #{}}
+    [#{topic => Topic,
+       module => on_news_item_reported_maybe_open_a_turn,
+       args => #{},
+       sources => members}
      || Topic <- mcl_spartan_topics:news_wire_topics()].
 
 %% ==========================================================================

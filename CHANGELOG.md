@@ -1,8 +1,30 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 (2026-10-30)
 
-- **The base library is macula 16** (macula-codebase-checks#4): the macula floor moves
+Refs macula-services/mcl-om#42, the migration of the mcl-* services onto
+mcl_om 1.6 and macula 18.
+
+- **On mcl_om 1.6 and macula 18, and the news wire now says who may deliver to
+  it.** `mcl_om` moves to `~> 1.6` and `macula` to `~> 18.0`; 18 still speaks
+  wire 1.0, so this mind still hears every wire 1.0 box. What it brings is two
+  refusals at boot, not two defaults (macula-io/macula#147), and this release
+  satisfies both:
+
+  | Rule | Before | Now |
+  | --- | --- | --- |
+  | who may CALL a capability with a handler | unspecified | none advertised: the mind speaks on the wire and serves no call |
+  | who may DELIVER to a subscription | unspecified = accepted | required; the news wire declares `sources => members` |
+
+  `members` is any publisher the realm admitted, which is what mcl-news — the
+  publisher of that wire — is. Not `{org, _}`, because nothing in this mesh
+  presents an org key yet, and not `{open, _}`, which would let a publisher
+  from outside the realm put words in the mind's mouth. A subscription that
+  names no source is refused, naming the topic, before the service starts.
+
+- **The base library is macula 16** (macula-codebase-checks#4), landed in main
+  before this release and shipped by it; the versions below are the ones it
+  landed with, and the entry above supersedes them: the macula floor moves
   `~> 15.6` to `~> 16.0`, and `mcl_om` to `~> 1.4`, the release whose own base is
   macula 16. 16.0 keeps wire 1.0, so this service still speaks to every wire 1.0 box;
   what it adds is the revocation bound (macula#118): an endorsement admits its holder

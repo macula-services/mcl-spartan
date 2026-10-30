@@ -118,7 +118,14 @@ the_two_topic_paths_are_the_ones_the_other_services_use_test() ->
     ?assertEqual([mcl_spartan_topics:news_wire_topic(Realm)],
                  mcl_spartan_topics:news_wire_topics()),
     ?assertEqual([on_news_item_reported_maybe_open_a_turn],
-                 [Mod || {_Topic, Mod, _Args} <- ?SERVICE:subscriptions()]).
+                 [Mod || #{module := Mod} <- ?SERVICE:subscriptions()]).
+
+%% WHO MAY DELIVER is part of the declaration, not a default (macula 18,
+%% macula#147; mcl-om 1.6). Pinned separately so that loosening the wire to
+%% `open' is a failing test here rather than a quiet word change there.
+every_subscription_names_its_sources_test() ->
+    ?assertEqual([members],
+                 [Sources || #{sources := Sources} <- ?SERVICE:subscriptions()]).
 
 %% The topics carry the realm NAME, so a mind on the wrong realm is caught at
 %% boot rather than by a wire that never speaks.
