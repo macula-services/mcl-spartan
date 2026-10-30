@@ -65,7 +65,7 @@ identity_spec() ->
 %% Who may deliver: `members' -- any publisher the realm admitted, which is
 %% what mcl-news, the publisher of the news wire, is. macula 18 has no default
 %% (macula#147) and mcl_om refuses a declaration that names none, so the
-%% decision is written here. Not `{org, _}`, because nothing in this mesh
+%% decision is written here. Not `{org, _}', because nothing in this mesh
 %% presents an org key yet, and not `{open, _}', which would let a publisher
 %% from outside the realm put words in the mind's mouth.
 -spec subscriptions() -> [mcl_om_service:subscription()].
